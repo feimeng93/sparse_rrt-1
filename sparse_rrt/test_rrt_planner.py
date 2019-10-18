@@ -1,5 +1,5 @@
 
-import _sst_module
+from sparse_rrt import _sst_module
 from sparse_rrt.systems import standard_cpp_systems
 import numpy as np
 import time

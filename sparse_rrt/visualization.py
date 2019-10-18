@@ -127,13 +127,16 @@ def create_svg_drawing():
     return RawSVGDrawing()
 
 
-def svg_rectangle((x, y), (width, height), (image_width, image_height), **extra):
+def svg_rectangle(xy, wh, iwih, **extra):
     '''
     Generate an svg rectangle with x, y in image coordinates in bottom-left coordinate system (!)
     :param x, y: left-bottom corner
     :param width, height: dimentions
     :return: string to add to svg xml
     '''
+    x, y = xy
+    width, height = wh
+    image_width, image_height = iwih
     drawing = create_svg_drawing()
     return drawing.rect(
         (x, image_height-y),

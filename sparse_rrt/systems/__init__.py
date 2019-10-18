@@ -1,4 +1,4 @@
-import standard_cpp_systems
+from . import standard_cpp_systems
 from sparse_rrt.systems.acrobot import Acrobot
 from sparse_rrt.systems.car import Car
 from sparse_rrt.systems.pendulum import Pendulum
