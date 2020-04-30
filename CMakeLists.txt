@@ -17,19 +17,19 @@ ENDIF(APPLE)
 # Instead of find_package(PythonLibs REQUIRED), we manually search for python to make sure we link to the active version
 # (as opposed to system python if brew python is installed)
 execute_process(
-    COMMAND "python2.7" -c "import sys;print(sys.prefix)"
+    COMMAND "python" -c "import sys;print(sys.prefix)"
     OUTPUT_VARIABLE PYTHON_PREFIX
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-if(APPLE)
-    set(PYTHON_LIBRARIES "${PYTHON_PREFIX}/lib/libpython2.7.dylib")
-else(APPLE)
-    # it seems like libpython2.7.so is not necessary on ubuntu
-    # set(PYTHON_LIBRARIES "${PYTHON_PREFIX}/lib/libpython2.7.so")
-endif(APPLE)
+#if(APPLE)
+#    set(PYTHON_LIBRARIES "${PYTHON_PREFIX}/lib/libpython2.7.dylib")
+#else(APPLE)
+# # it seems like libpython2.7.so is not necessary on ubuntu
+#   # set(PYTHON_LIBRARIES "${PYTHON_PREFIX}/lib/libpython2.7.so")
+    #endif(APPLE)
 
 execute_process(
-    COMMAND "python2.7" -c "from distutils import sysconfig; print(sysconfig.get_python_inc())"
+    COMMAND "python" -c "from distutils import sysconfig; print(sysconfig.get_python_inc())"
     OUTPUT_VARIABLE PYTHON_INCLUDE_DIRS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
@@ -46,6 +46,7 @@ include_directories(
 set(SOURCE_FILES
         src/motion_planners/rrt.cpp
         src/motion_planners/sst.cpp
+        src/motion_planners/sst_backend.cpp
         src/nearest_neighbors/graph_nearest_neighbors.cpp
         src/systems/car.cpp
         src/systems/cart_pole.cpp

@@ -27,6 +27,7 @@
 
 #include "motion_planners/sst.hpp"
 #include "motion_planners/rrt.hpp"
+#include "motion_planners/sst_backend.hpp"
 
 #include "image_creation/planner_visualization.hpp"
 #include "systems/distance_functions.h"
@@ -226,6 +227,8 @@ public:
         return this->planner->get_number_of_nodes();
     }
 
+    py::object nearest_vertex(const py::safe_array<double> &sample_state_array){};
+
 protected:
 	/**
 	 * @brief Created planner object
@@ -303,7 +306,7 @@ public:
             };
 
         planner.reset(
-                new sst_t(
+                new sst_backend_t(
                         &start_state(0), &goal_state(0), goal_radius,
                         state_bounds_v, control_bounds_v,
                         distance_f,
@@ -311,6 +314,116 @@ public:
                         sst_delta_near, sst_delta_drain)
         );
     }
+private:
+
+	/**
+	 * @brief Captured distance computer python object to prevent its premature death
+	 */
+    py::object  _distance_computer_py;
+};
+
+class __attribute__ ((visibility ("hidden"))) SSTBackendWrapper{
+    
+public:
+
+	/**
+	 * @brief Python wrapper of SST planner Constructor
+	 * @details Python wrapper of SST planner Constructor
+	 *
+	 * @param state_bounds_array numpy array (N x 2) with boundaries of the state space (min and max)
+	 * @param control_bounds_array numpy array (N x 2) with boundaries of the control space (min and max)
+	 * @param distance_computer_py Python wrapper of distance_t implementation
+	 * @param start_state_array The start state (numpy array)
+	 * @param goal_state_array The goal state  (numpy array)
+	 * @param goal_radius The radial size of the goal region centered at in_goal.
+	 * @param random_seed The seed for the random generator
+	 * @param sst_delta_near Near distance threshold for SST
+	 * @param sst_delta_drain Drain distance threshold for SST
+	 */
+    SSTBackendWrapper(
+            const py::safe_array<double> &state_bounds_array,
+            const py::safe_array<double> &control_bounds_array,
+            py::object distance_computer_py,
+            const py::safe_array<double> &start_state_array,
+            const py::safe_array<double> &goal_state_array,
+            double goal_radius,
+            unsigned int random_seed,
+            double sst_delta_near,
+            double sst_delta_drain
+    )
+        : _distance_computer_py(distance_computer_py)  // capture distance computer to avoid segfaults because we use a raw pointer from it
+    {
+        if (state_bounds_array.shape()[0] != start_state_array.shape()[0]) {
+            throw std::domain_error("State bounds and start state arrays have to be equal size");
+        }
+
+        if (state_bounds_array.shape()[0] != goal_state_array.shape()[0]) {
+            throw std::domain_error("State bounds and goal state arrays have to be equal size");
+        }
+
+        distance_t* distance_computer = distance_computer_py.cast<distance_t*>();
+
+        auto state_bounds = state_bounds_array.unchecked<2>();
+        auto control_bounds = control_bounds_array.unchecked<2>();
+        auto start_state = start_state_array.unchecked<1>();
+        auto goal_state = goal_state_array.unchecked<1>();
+
+        typedef std::pair<double, double> bounds_t;
+        std::vector<bounds_t> state_bounds_v;
+
+        for (unsigned int i = 0; i < state_bounds_array.shape()[0]; i++) {
+            state_bounds_v.push_back(bounds_t(state_bounds(i, 0), state_bounds(i, 1)));
+        }
+
+        std::vector<bounds_t> control_bounds_v;
+        for (unsigned int i = 0; i < control_bounds_array.shape()[0]; i++) {
+            control_bounds_v.push_back(bounds_t(control_bounds(i, 0), control_bounds(i, 1)));
+        }
+
+        std::function<double(const double*, const double*, unsigned int)>  distance_f =
+            [distance_computer] (const double* p0, const double* p1, unsigned int dims) {
+                return distance_computer->distance(p0, p1, dims);
+            };
+
+        planner.reset(
+                new sst_backend_t(
+                        &start_state(0), &goal_state(0), goal_radius,
+                        state_bounds_v, control_bounds_v,
+                        distance_f,
+                        random_seed,
+                        sst_delta_near, sst_delta_drain)
+        );
+    }
+
+    /**
+    * @copydoc sst_backend_t::nearest_vertex()
+    */
+    py::object nearest_vertex(const py::safe_array<double> &sample_state_array){
+        auto sample_state = sample_state_array.unchecked<1>();
+        nearest = this -> planner -> nearest_vertex(&sample_state(0));
+        const double* nearest_point = nearest -> get_point();
+        
+        py::safe_array<double> nearest_array({sample_state_array.shape()[0]});
+        auto state_ref = nearest_array.mutable_unchecked<1>();
+        for (unsigned int i = 0; i < sample_state_array.shape()[0]; i++){
+            state_ref(i) = nearest_point[i];
+        }
+        return nearest_array;
+    }
+
+    void add_to_tree(const py::safe_array<double> &sample_state_array,
+        double duration
+    ){
+        auto sample_state = sample_state_array.unchecked<1>();
+        const double* sample_control = new double[planner -> get_control_dimension()];
+        planner -> add_to_tree(&sample_state(0), sample_control, nearest, duration);       
+
+    }
+
+protected:
+    std::unique_ptr<sst_backend_t> planner;
+    sst_node_t* nearest;
+
 private:
 
 	/**
@@ -567,6 +680,35 @@ PYBIND11_MODULE(_sst_module, m) {
             "random_seed"_a,
             "sst_delta_near"_a,
             "sst_delta_drain"_a
+        )
+   ;
+
+   py::class_<SSTBackendWrapper>(m, "SSTBackendWrapper", planner)
+        .def(py::init<const py::safe_array<double>&,
+                      const py::safe_array<double>&,
+                      py::object,
+                      const py::safe_array<double>&,
+                      const py::safe_array<double>&,
+                      double,
+                      unsigned int,
+                      double,
+                      double>(),
+            "state_bounds"_a,
+            "control_bounds"_a,
+            "distance"_a,
+            "start_state"_a,
+            "goal_state"_a,
+            "goal_radius"_a,
+            "random_seed"_a,
+            "sst_delta_near"_a,
+            "sst_delta_drain"_a
+        )
+        .def("nearest_vertex", &SSTBackendWrapper::nearest_vertex,
+            "sample_state_array"_a
+        )
+        .def("add_to_tree", &SSTBackendWrapper::add_to_tree,
+            "sample_state_array"_a,
+            "duration"_a
         )
    ;
 
