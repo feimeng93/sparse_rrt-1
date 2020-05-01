@@ -73,3 +73,16 @@ set_target_properties(sst_module PROPERTIES
         SUFFIX ".so"
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
         )
+
+set(MPC_SOURCE
+    src/systems/two_link_acrobot_obs_t.cpp
+    src/mpc/solvers/cem.cpp)
+
+add_library(cemmpc SHARED
+    ${MPC_SOURCE})
+
+add_executable(
+    test_mpc
+    src/mpc/tests/main.cpp)
+
+target_link_libraries(test_mpc cemmpc)
