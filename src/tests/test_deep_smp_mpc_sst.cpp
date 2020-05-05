@@ -24,10 +24,10 @@ int main(){
     //                 c.mu_t, c.std_t, c.t_max, 
     //                 c.dt, c.loss_weights, c.max_it, true);
     double loss_weights[4] = {1, 1, 0.3, 0.3};
-    int ns = 3,
-        nt = 2,
-        ne = 2,
-        max_it = 1;
+    int ns = 1024,
+        nt = 5,
+        ne = 32,
+        max_it = 20;
     double converge_r = 0.1,
         mu_u = 0,
         std_u = 4,
@@ -40,6 +40,7 @@ int main(){
                     mu_u, std_u, 
                     mu_t, std_t, t_max, 
                     dt, loss_weights, max_it, true);
+    
     deep_smp_mpc_sst_t* planner;
 
     double in_start[4] = {0, 0, 0, 0};
@@ -56,7 +57,7 @@ int main(){
         model->get_control_bounds(),
         two_link_acrobot_obs_t::distance,
         0,
-        1, 0.5,
+        5e-1, 1e-2,
         &cem);
     planner -> step(model, 10, 50, dt);
     const double start[4] = {-0.42044061,  0.96072684, -0.84960626,  2.32958837};

@@ -275,15 +275,24 @@ double two_link_acrobot_obs_t::angular_error(double angle, double goal){
 }
 
 void two_link_acrobot_obs_t::normalize(const double* state, double* normalized){
-    normalized[STATE_THETA_1] = state[STATE_THETA_1] - (-M_PI) / (M_PI - (-M_PI)) * 2 - 1;
-    normalized[STATE_THETA_2] = state[STATE_THETA_2] - (-M_PI) / (M_PI - (-M_PI)) * 2 - 1;
-    normalized[STATE_V_1] = state[STATE_V_1] - (MIN_V_1) / (MAX_V_1 - (MIN_V_1)) * 2 - 1;
-    normalized[STATE_V_2] = state[STATE_V_2] - (MIN_V_2) / (MAX_V_2 - (MIN_V_2)) * 2 -1;
+    normalized[STATE_THETA_1] = state[STATE_THETA_1]/ (M_PI);
+    normalized[STATE_THETA_2] = state[STATE_THETA_2]/ (M_PI);
+    normalized[STATE_V_1] = state[STATE_V_1]/ (MAX_V_1);
+    normalized[STATE_V_2] = state[STATE_V_2]/ (MAX_V_2);
+
+    // normalized[STATE_THETA_1] = (state[STATE_THETA_1] - (-M_PI)) / (M_PI - (-M_PI)) * 2 - 1;
+    // normalized[STATE_THETA_2] = (state[STATE_THETA_2] - (-M_PI)) / (M_PI - (-M_PI)) * 2 - 1;
+    // normalized[STATE_V_1] = (state[STATE_V_1] - MIN_V_1) / (MAX_V_1 - MIN_V_1) * 2 - 1;
+    // normalized[STATE_V_2] = (state[STATE_V_2] - MIN_V_2) / (MAX_V_2 - MIN_V_2) * 2 -1;
 }
 
 void two_link_acrobot_obs_t::denormalize(double* normalized, double* state){
-    state[STATE_THETA_1] = (normalized[STATE_THETA_1] + 1) / 2 *(M_PI - (-M_PI)) + (-M_PI);
-    state[STATE_THETA_2] = (normalized[STATE_THETA_2] + 1) / 2 *(M_PI - (-M_PI)) + (-M_PI);
-    state[STATE_V_1] = (normalized[STATE_V_1] + 1) / 2 *(MAX_V_1 - MAX_V_1) + (MIN_V_1);
-    state[STATE_V_2] = (normalized[STATE_V_2] + 1) / 2 *(MAX_V_2 - MAX_V_2) + (MIN_V_2);
+    state[STATE_THETA_1] = normalized[STATE_THETA_1] * (M_PI);
+    state[STATE_THETA_2] = normalized[STATE_THETA_2] * (M_PI);
+    state[STATE_V_1] = (normalized[STATE_V_1]) * (MAX_V_1);
+    state[STATE_V_2] = (normalized[STATE_V_2]) * (MAX_V_2);
+    // state[STATE_THETA_1] = (normalized[STATE_THETA_1] + 1) / 2 *(M_PI - (-M_PI)) + (-M_PI);
+    // state[STATE_THETA_2] = (normalized[STATE_THETA_2] + 1) / 2 *(M_PI - (-M_PI)) + (-M_PI);
+    // state[STATE_V_1] = (normalized[STATE_V_1] + 1) / 2 *(MAX_V_1 - MIN_V_1) + (MIN_V_1);
+    // state[STATE_V_2] = (normalized[STATE_V_2] + 1) / 2 *(MAX_V_2 - MIN_V_2) + (MIN_V_2);
 }

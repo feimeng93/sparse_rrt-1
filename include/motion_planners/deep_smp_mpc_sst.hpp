@@ -101,8 +101,8 @@ public:
 	 * @brief Applies bvp or mpc or random to steer
 	 * @details Applies bvp or mpc or random to steer
 	 */
-	virtual bool steer(enhanced_system_t* system, const double* start, const double* sample, double* terminal_state, 
-		double* duration,  double integration_step);
+	virtual double steer(enhanced_system_t* system, const double* start, const double* sample, double* terminal_state, 
+		double integration_step);
 
 	/**
 	 * @brief sample a point with neural network

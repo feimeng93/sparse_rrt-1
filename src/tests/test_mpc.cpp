@@ -67,7 +67,7 @@ int main(){
                             dt);
         current_loss = model->get_loss(state, goal, loss_weights);
         if (current_loss < converge_r){
-            cout <<"reached:"<< endl;
+            cout <<"reached"<< endl;
             break;
         }
     }

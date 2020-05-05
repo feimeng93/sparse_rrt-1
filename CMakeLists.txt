@@ -17,7 +17,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(INCLUDE_DIRECTORIES include)
 
-#add_definitions(-O3 )
+add_definitions(-O3 )
 
 IF(APPLE)
    set(CMAKE_MACOSX_RPATH 1)
@@ -51,8 +51,25 @@ include_directories(
         "${PROJECT_SOURCE_DIR}/deps/pybind11/include"
         # #torch
         ${TORCH_INCLUDE_DIRS}
-
         )
+
+
+set(MPC_SOURCE
+    src/systems/two_link_acrobot_obs_t.cpp
+    src/trajectory_optimizers/cem.cpp)
+
+add_library(cemmpc SHARED
+    ${MPC_SOURCE}
+    )
+
+add_executable(
+    test_mpc
+    src/tests/test_mpc.cpp
+    #${MPC_SOURCE}
+    )
+
+target_link_libraries(test_mpc cemmpc)
+
 
 set(SOURCE_FILES
         src/motion_planners/rrt.cpp
@@ -77,7 +94,7 @@ add_library(${PROJECT_NAME} STATIC
 
 add_library(sst_module SHARED
     ${PROJECT_SOURCE_DIR}/src/python_wrapper.cpp)
-target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME} ${TORCH_LIBRARIES})
+target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME} ${TORCH_LIBRARIES} cemmpc)
 
 # Don't prepend wrapper library name with lib and add to Python libs.
 set_target_properties(sst_module PROPERTIES
@@ -86,32 +103,17 @@ set_target_properties(sst_module PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
         )
 
-set(MPC_SOURCE
-    src/systems/two_link_acrobot_obs_t.cpp
-    src/trajectory_optimizers/cem.cpp)
-
-add_library(cemmpc SHARED
-    ${MPC_SOURCE}
-    )
-
-add_executable(
-    test_mpc
-    src/tests/test_mpc.cpp
-    #${MPC_SOURCE}
-    )
-
-target_link_libraries(test_mpc cemmpc)
-
 
 add_executable(test_deep_smp_mpc_sst
     src/tests/test_deep_smp_mpc_sst.cpp
-    ${SOURCE_FILES}
+    #${SOURCE_FILES}
     #${MPC_SOURCE}
     )
 
 target_link_libraries(
     test_deep_smp_mpc_sst   
     ${TORCH_LIBRARIES}
+    ${PROJECT_NAME}
     cemmpc
     )
 set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
