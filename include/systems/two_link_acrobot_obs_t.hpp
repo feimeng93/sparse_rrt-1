@@ -16,9 +16,9 @@
 #define SPARSE_TWO_LINK_ACROBOT_OBS_HPP
 
 
-#include "systems/mpc_system.hpp"
+#include "systems/enhanced_system.hpp"
 
-class two_link_acrobot_obs_t : public system_t
+class two_link_acrobot_obs_t : public enhanced_system_t
 {
 public:
 	// two_link_acrobot_obs_t(){
@@ -34,7 +34,7 @@ public:
 		temp_state = new double[state_dimension];
 		deriv = new double[state_dimension];
 		// copy the items from _obs_list to obs_list
-		for(unsigned i=0;i<_obs_list.size();i++)
+		for(unsigned i=0; i<_obs_list.size(); i++)
 		{
 			// each obstacle is represented by its middle point
 			std::vector<double> obs(4*2);
@@ -102,15 +102,35 @@ public:
 	 */
     std::vector<bool> is_circular_topology() const override;
 
+    /**
+	 * compute the L1 error of two states
+	 */
+	double get_loss(double* state, const double* goal, double* weight);
 
-	virtual double get_loss(double* state, double* goal, double* weight);
-
+    /**
+	 * compute the error between to angles from -pi to pi and wrap the error back to 0~pi
+	 */
 	double angular_error(double angle, double goal);
+
+    /**
+	 * obstacle lists vector<vector<>>
+	 */
+	std::vector<std::vector<double>> obs_list;
+    
+	/**
+	 * normalize state to [-1,1]^4
+	 */
+	void normalize(const double* state, double* normalized);
+
+	/**
+	 * denormalize state back to [-pi, pi]^2 * [-6, 6]^2
+	 */ 
+	void denormalize(double* normalized,  double* state);
+
 protected:
 	double* deriv;
 	void update_derivative(const double* control);
 	// for obstacle
-	std::vector<std::vector<double>> obs_list;
 	// collision checker
 	// from http://www.jeffreythompson.org/collision-detection/line-rect.php
 	bool lineLine(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4);

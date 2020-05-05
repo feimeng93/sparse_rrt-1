@@ -4,9 +4,9 @@
 #include <cmath>
 #include <string>
 // #include <ompl/base/StateValidityChecker.h>
-#include "systems/mpc_system.hpp"
+#include "systems/enhanced_system.hpp"
 
-class quadrotor_t : public system_t
+class quadrotor_t : public enhanced_system_t
 {
 public:
 	quadrotor_t(unsigned env_id){
@@ -16,7 +16,7 @@ public:
 		deriv = new double[control_dimension]();
 	}
 	virtual ~quadrotor_t(){
-		delete temp_state
+		delete temp_state;
 	}
 	virtual bool propagate(
 		const double* start_state, unsigned int state_dimension,

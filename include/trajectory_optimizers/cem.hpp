@@ -1,24 +1,28 @@
-#include "systems/mpc_system.hpp"
+#include "systems/enhanced_system.hpp"
 #include <vector>
 #include <random>
 #include <utility>
 #include "iostream"
 #include <algorithm>
 
-namespace solvers{
+#ifndef CEM_HPP
+#define CEM_HPP
+namespace trajectory_optimizers{
     class CEM{
         public:
-            CEM(system_t* model, int number_of_samples, int number_of_t,
-                int number_of_elite, double converge_r, 
+            CEM(enhanced_system_t* model, unsigned int number_of_samples, unsigned int number_of_t,
+                unsigned int number_of_elite, double converge_r, 
                 double control_means, double control_stds, 
                 double time_means, double time_stds, double max_duration,
-                double integration_step, double* loss_weights, int max_iteration, bool verbose){
+                double integration_step, double* loss_weights, unsigned int max_iteration, bool verbose){
                     system = model;
                     this -> number_of_samples = number_of_samples;
                     this -> number_of_t = number_of_t;
                     this -> number_of_elite = number_of_elite;
                     mu_u0 = control_means;
                     std_u0 = control_stds;
+                    mu_t0 = time_means;
+                    std_t0 = time_stds;
                     this -> max_duration = max_duration;
                     s_dim = system -> get_state_dimension();
                     c_dim = system -> get_control_dimension();
@@ -45,12 +49,6 @@ namespace solvers{
                     sum_of_square_time = new double[number_of_t];
                     active_mask = new bool[number_of_samples];
             }
-            // (state, goal) -> u, update mu_u and std_u
-            void solve(double* start, double* goal, double* best_u, double* best_t);
-
-            // (start, goal) -> state, update [path], slide mu_u and std_u
-            std::vector<std::vector<double>> rolling(double* start, double* goal);
-
             ~CEM(){
                 delete mu_u;
                 delete std_u;
@@ -60,24 +58,44 @@ namespace solvers{
                 delete controls;
                 delete time;
                 delete current_state;
-                delete sum_of_controls, sum_of_square_controls, sum_of_time, sum_of_square_time, active_mask;
+                delete sum_of_controls;
+                delete sum_of_square_controls;
+                delete sum_of_time;
+                delete sum_of_square_time;
+                delete active_mask;
             };
 
+            unsigned int get_control_dimension();
+            
+            unsigned int get_num_step();
+
+            // (state, goal) -> u, update mu_u and std_u
+            void solve(const double* start, const double* goal, double *best_u, double *best_t);
+            // (start, goal) -> state, update [path], slide mu_u and std_u
+            std::vector<std::vector<double>> rolling(double* start, double* goal);
+            
+            double converge_radius;
+            double* weight;
+
         protected:
-            system_t *system;
-            int number_of_samples, number_of_t, number_of_elite, it_max;
+            enhanced_system_t *system;
+            unsigned int number_of_samples, number_of_t, number_of_elite, it_max;
             double dt;
             unsigned s_dim, c_dim;
             double *states/* ns * dim_state */, 
                 *controls/* ns * nt * dim_control */, *time/* ns * nt */,
                 *current_state/* dim_state */;
             bool *active_mask/* ns */;
-            double converge_radius;
-            double *mu_u/* nt * dim_control */, *std_u /* nt * dim_control */, *mu_t/* nt */, *std_t/* nt */, *weight;  
+            double *mu_u/* nt * dim_control */, *std_u /* nt * dim_control */, *mu_t/* nt */, *std_t/* nt */;  
             double mu_u0, std_u0, mu_t0, std_t0, max_duration;
             std::vector<std::pair<double, int>> loss;
             std::default_random_engine generator;
             bool verbose;
-            double *sum_of_controls, *sum_of_square_controls, *sum_of_time, *sum_of_square_time;
+            double *sum_of_controls;
+            double *sum_of_square_controls;
+            double *sum_of_time;
+            double *sum_of_square_time;
     };
 }
+
+#endif

@@ -65,7 +65,7 @@ bool two_link_acrobot_obs_t::propagate(
             temp_state[1] = start_state[1];
             temp_state[2] = start_state[2];
             temp_state[3] = start_state[3];
-            bool validity = false;
+            bool validity = true;
             // find the last valid position, if no valid position is found, then return false
             for(int i=0;i<num_steps;i++)
             {
@@ -86,6 +86,7 @@ bool two_link_acrobot_obs_t::propagate(
                     }
                     else
                     {
+                        validity = false;
                         // Found the earliest invalid position. break the loop and return
                         break;
                     }
@@ -256,7 +257,7 @@ std::vector<bool> two_link_acrobot_obs_t::is_circular_topology() const{
     };
 }
 
-double two_link_acrobot_obs_t::get_loss(double* state, double* goal, double* weight){
+double two_link_acrobot_obs_t::get_loss(double* state, const double* goal, double* weight){
     return angular_error(state[0], goal[0]) * weight[0] + angular_error(state[1], goal[1])* weight[1] +
         // (state[2] - goal[2]) * (state[2] - goal[2]) * weight[2] + (state[3] - goal[3]) * (state[3] - goal[3]) * weight[3];
         abs(state[2] - goal[2]) * weight[2] + abs(state[3] - goal[3]) * weight[3];
@@ -270,7 +271,19 @@ double two_link_acrobot_obs_t::angular_error(double angle, double goal){
     else if (error > M_PI){
         error = 2*M_PI - error;
     }
-
     return error;
+}
 
+void two_link_acrobot_obs_t::normalize(const double* state, double* normalized){
+    normalized[STATE_THETA_1] = state[STATE_THETA_1] - (-M_PI) / (M_PI - (-M_PI)) * 2 - 1;
+    normalized[STATE_THETA_2] = state[STATE_THETA_2] - (-M_PI) / (M_PI - (-M_PI)) * 2 - 1;
+    normalized[STATE_V_1] = state[STATE_V_1] - (MIN_V_1) / (MAX_V_1 - (MIN_V_1)) * 2 - 1;
+    normalized[STATE_V_2] = state[STATE_V_2] - (MIN_V_2) / (MAX_V_2 - (MIN_V_2)) * 2 -1;
+}
+
+void two_link_acrobot_obs_t::denormalize(double* normalized, double* state){
+    state[STATE_THETA_1] = (normalized[STATE_THETA_1] + 1) / 2 *(M_PI - (-M_PI)) + (-M_PI);
+    state[STATE_THETA_2] = (normalized[STATE_THETA_2] + 1) / 2 *(M_PI - (-M_PI)) + (-M_PI);
+    state[STATE_V_1] = (normalized[STATE_V_1] + 1) / 2 *(MAX_V_1 - MAX_V_1) + (MIN_V_1);
+    state[STATE_V_2] = (normalized[STATE_V_2] + 1) / 2 *(MAX_V_2 - MAX_V_2) + (MIN_V_2);
 }

@@ -8,7 +8,8 @@
             "request": "launch",
             // Resolved by CMake Tools:
             // "program": "${command:cmake.launchTargetPath}",
-            "program": "${workspaceFolder}/bin/test_mpc",
+            // "program": "${workspaceFolder}/bin/test_mpc",
+            "program": "${workspaceFolder}/bin/test_deep_smp_mpc_sst",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -19,7 +20,7 @@
                 },
                
             ],
-            "externalConsole": true,
+            "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
                 {

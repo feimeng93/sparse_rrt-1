@@ -12,8 +12,8 @@
  *
  */
 
-#ifndef SPARSE_SYSTEM_HPP
-#define SPARSE_SYSTEM_HPP
+#ifndef SPARSE_ENHANCED_SYSTEM_HPP
+#define SPARSE_ENHANCED_SYSTEM_HPP
 #include <tuple>
 #include <vector>
 
@@ -25,7 +25,7 @@
  * TODO: This currently includes visualization abilities, but it should be moved out
  *
  */
-struct system_interface {
+struct enhanced_system_interface {
     /**
 	 * @brief Performs a local propagation using simple numerical integration.
 	 * @details Performs a local propagation using simple numerical integration.
@@ -79,8 +79,6 @@ struct system_interface {
     {
     	return "";
     }
-
-
 };
 
 
@@ -91,11 +89,11 @@ struct system_interface {
  * and controls, and visualizing points.
  *
  */
-class system_t: public system_interface
+class enhanced_system_t: public enhanced_system_interface
 {
 public:
-	system_t(){}
-	virtual ~system_t(){}
+	enhanced_system_t(){}
+	virtual ~enhanced_system_t(){}
 
     /**
 	 * @brief The dimensionality of the state space.
@@ -140,7 +138,17 @@ public:
      */
 	virtual std::vector<bool> is_circular_topology() const = 0;
 
-	virtual double get_loss(double* state, double* goal, double* weight) = 0;
+	virtual double get_loss(double* state, const double* goal, double* weight) = 0;
+
+	/**
+	 * normalize state to [-1,1]^4
+	 */
+	virtual void normalize(const double* state, double* normalized) = 0;
+
+	/**
+	 * denormalize state back
+	 */ 
+	virtual void denormalize(double* normalized, double* state) = 0;
 
 protected:
 

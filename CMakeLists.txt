@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 2.8)
 project(SparseRRT)
 
+# appending torch and cuda settings
+list(APPEND CMAKE_PREFIX_PATH
+    /media/arclabdl1/HD1/Linjun/external/libtorch
+    /usr/local/cuda
+    )
+set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
+find_package(Torch REQUIRED)
+
+
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 set(CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS}")
@@ -8,7 +17,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(INCLUDE_DIRECTORIES include)
 
-add_definitions(-O3 )
+#add_definitions(-O3 )
 
 IF(APPLE)
    set(CMAKE_MACOSX_RPATH 1)
@@ -40,8 +49,10 @@ include_directories(
         ${PYTHON_INCLUDE_DIRS}
         "${PROJECT_SOURCE_DIR}/include"
         "${PROJECT_SOURCE_DIR}/deps/pybind11/include"
-        )
+        # #torch
+        ${TORCH_INCLUDE_DIRS}
 
+        )
 
 set(SOURCE_FILES
         src/motion_planners/rrt.cpp
@@ -58,14 +69,15 @@ set(SOURCE_FILES
         src/utilities/timer.cpp
         src/image_creation/svg_image.cpp
         src/image_creation/planner_visualization.cpp
-        src/systems/distance_functions.cpp)
+        src/systems/distance_functions.cpp
+        src/motion_planners/deep_smp_mpc_sst.cpp)
 
 add_library(${PROJECT_NAME} STATIC
     ${SOURCE_FILES})
 
 add_library(sst_module SHARED
     ${PROJECT_SOURCE_DIR}/src/python_wrapper.cpp)
-target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME})
+target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME} ${TORCH_LIBRARIES})
 
 # Don't prepend wrapper library name with lib and add to Python libs.
 set_target_properties(sst_module PROPERTIES
@@ -76,13 +88,36 @@ set_target_properties(sst_module PROPERTIES
 
 set(MPC_SOURCE
     src/systems/two_link_acrobot_obs_t.cpp
-    src/mpc/solvers/cem.cpp)
+    src/trajectory_optimizers/cem.cpp)
 
 add_library(cemmpc SHARED
-    ${MPC_SOURCE})
+    ${MPC_SOURCE}
+    )
 
 add_executable(
     test_mpc
-    src/mpc/tests/main.cpp)
+    src/tests/test_mpc.cpp
+    #${MPC_SOURCE}
+    )
 
 target_link_libraries(test_mpc cemmpc)
+
+
+add_executable(test_deep_smp_mpc_sst
+    src/tests/test_deep_smp_mpc_sst.cpp
+    ${SOURCE_FILES}
+    #${MPC_SOURCE}
+    )
+
+target_link_libraries(
+    test_deep_smp_mpc_sst   
+    ${TORCH_LIBRARIES}
+    cemmpc
+    )
+set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
+set_property(TARGET test_deep_smp_mpc_sst PROPERTY CXX_STANDARD 14)
+
+
+SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
+SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
