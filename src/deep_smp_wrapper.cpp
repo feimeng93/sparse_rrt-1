@@ -33,7 +33,9 @@ public:
             double sst_delta_drain,
             const py::safe_array<double> &obs_list_array,
             double width,
-            bool verbose
+            bool verbose,
+            int ns, int nt, int ne, int max_it,
+            double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step
     ){
         auto start_state = start_state_array.unchecked<1>();
         auto goal_state = goal_state_array.unchecked<1>();
@@ -57,18 +59,8 @@ public:
 
         system = new two_link_acrobot_obs_t(obs_list, width);
 
-        int ns = 32,
-            nt = 5,
-            ne = 4,
-            max_it = 5;
-        double converge_r = 1e-1,
-            mu_u = 0,
-            std_u = 4,
-            mu_t = 0.1,
-            std_t = 0.4,
-            t_max = 0.5,
-            step_size = 0.5;
-        dt = 2e-2;
+       
+        dt = integration_step;
         
         cem.reset(
             new trajectory_optimizers::CEM(
@@ -198,7 +190,8 @@ private:
 PYBIND11_MODULE(_deep_smp_module, m) {
     m.doc() = "Python wrapper for deep smp planners";
     py::class_<DSSTMPCWrapper>(m, "DSSTMPCWrapper")
-        .def(py::init<const py::safe_array<double>&,
+        .def(py::init<
+            const py::safe_array<double>&,
             const py::safe_array<double>&,
             double,
             unsigned int,
@@ -206,8 +199,9 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             double,
             const py::safe_array<double>&,
             double,
-            bool>(),
-                        
+            bool,
+            int, int, int, int,
+            double, double, double, double, double, double, double, double>(),
             "start_state"_a,
             "goal_state"_a,
             "goal_radius"_a,
@@ -216,7 +210,9 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "sst_delta_drain"_a,
             "obs_list"_a,
             "width"_a,
-            "verbose"_a
+            "verbose"_a,
+            "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
+            "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a
         )
         .def("step", &DSSTMPCWrapper::step,
             "min_time_steps"_a,

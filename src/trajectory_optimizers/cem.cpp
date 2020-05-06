@@ -188,17 +188,18 @@ namespace trajectory_optimizers{
             }
             for(unsigned int ti = 0; ti < number_of_t; ti++){
                 for(unsigned int ci = 0; ci < c_dim; ci++){
-                    mu_u[ti * c_dim + ci] = sum_of_controls[ti * c_dim + ci] / number_of_elite;
-                    std_u[ti * c_dim + ci] = sqrt(
+                    mu_u[ti * c_dim + ci] = step_size * sum_of_controls[ti * c_dim + ci] / number_of_elite + 
+                        (1-step_size)*mu_u[ti * c_dim + ci];
+                    std_u[ti * c_dim + ci] = step_size * sqrt(
                         sum_of_square_controls[ti * c_dim + ci] / 
                         number_of_elite - mu_u[ti * c_dim + ci] * mu_u[ti * c_dim + ci]
-                        );
+                        ) + (1-step_size) * std_u[ti * c_dim + ci];
                 }
-                mu_t[ti] = sum_of_time[ti] / number_of_elite;
-                std_t[ti] = sqrt(
+                mu_t[ti] = step_size * sum_of_time[ti] / number_of_elite + (1-step_size)*mu_t[ti];
+                std_t[ti] = step_size * sqrt(
                     sum_of_square_time[ti] / number_of_elite - 
                         mu_t[ti] * mu_t[ti]
-                    );
+                    ) + (1-step_size) * (std_t[ti]);
             }
            
         
