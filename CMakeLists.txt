@@ -17,7 +17,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(INCLUDE_DIRECTORIES include)
 
-add_definitions(-O3 )
+#add_definitions(-O3 )
+SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
+SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
+
 
 IF(APPLE)
    set(CMAKE_MACOSX_RPATH 1)
@@ -53,48 +57,41 @@ include_directories(
         ${TORCH_INCLUDE_DIRS}
         )
 
+set(PLANNING_UTILS
+    src/nearest_neighbors/graph_nearest_neighbors.cpp
+    src/utilities/timer.cpp
+    src/utilities/random.cpp
+    src/image_creation/svg_image.cpp
+    src/image_creation/planner_visualization.cpp
 
-set(MPC_SOURCE
-    src/systems/two_link_acrobot_obs_t.cpp
-    src/trajectory_optimizers/cem.cpp)
+)
 
-add_library(cemmpc SHARED
-    ${MPC_SOURCE}
-    )
-
-add_executable(
-    test_mpc
-    src/tests/test_mpc.cpp
-    #${MPC_SOURCE}
-    )
-
-target_link_libraries(test_mpc cemmpc)
-
-
+# for SST
 set(SOURCE_FILES
-        src/motion_planners/rrt.cpp
-        src/motion_planners/sst.cpp
-        src/motion_planners/sst_backend.cpp
-        src/nearest_neighbors/graph_nearest_neighbors.cpp
-        src/systems/car.cpp
-        src/systems/cart_pole.cpp
-        src/systems/pendulum.cpp
-        src/systems/point.cpp
-        src/systems/rally_car.cpp
-        src/systems/two_link_acrobot.cpp
-        src/utilities/random.cpp
-        src/utilities/timer.cpp
-        src/image_creation/svg_image.cpp
-        src/image_creation/planner_visualization.cpp
-        src/systems/distance_functions.cpp
-        src/motion_planners/deep_smp_mpc_sst.cpp)
+    src/motion_planners/rrt.cpp
+    src/motion_planners/sst.cpp
+    src/motion_planners/sst_backend.cpp
+    #src/nearest_neighbors/graph_nearest_neighbors.cpp
+    src/systems/car.cpp
+    src/systems/cart_pole.cpp
+    src/systems/pendulum.cpp
+    src/systems/point.cpp
+    src/systems/rally_car.cpp
+    src/systems/two_link_acrobot.cpp
+    #src/utilities/random.cpp
+    #src/utilities/timer.cpp
+    #src/image_creation/svg_image.cpp
+    #src/image_creation/planner_visualization.cpp
+    src/systems/distance_functions.cpp
+   ${PLANNING_UTILS}
+)
 
 add_library(${PROJECT_NAME} STATIC
     ${SOURCE_FILES})
 
 add_library(sst_module SHARED
     ${PROJECT_SOURCE_DIR}/src/python_wrapper.cpp)
-target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME} ${TORCH_LIBRARIES} cemmpc)
+target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME})
 
 # Don't prepend wrapper library name with lib and add to Python libs.
 set_target_properties(sst_module PROPERTIES
@@ -102,24 +99,73 @@ set_target_properties(sst_module PROPERTIES
         SUFFIX ".so"
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
         )
+set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
 
+# for mpc and cem
+set(MPC_SOURCE
+    src/systems/two_link_acrobot_obs_t.cpp
+    src/trajectory_optimizers/cem.cpp)
+
+add_library(CEMMPC SHARED
+    ${MPC_SOURCE}
+    )
+
+### for steer module
+add_library(steer_module SHARED
+    src/systems/two_link_acrobot_obs_t.cpp
+    ${PROJECT_SOURCE_DIR}/src/steer_wrapper.cpp
+    )
+target_link_libraries(steer_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
+
+# Don't prepend wrapper library name with lib and add to Python libs.
+set_target_properties(steer_module PROPERTIES
+        PREFIX "_"
+        SUFFIX ".so"
+        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
+        )
+#### for steer module
+
+set(DEEP_SMP_MODULE
+    ${PLANNING_UTILS}
+    src/motion_planners/sst.cpp
+    src/motion_planners/deep_smp_mpc_sst.cpp
+)
+
+
+add_library(deep_smp_module SHARED
+    ${PROJECT_SOURCE_DIR}/src/deep_smp_wrapper.cpp
+    ${DEEP_SMP_MODULE}
+    )
+target_link_libraries(deep_smp_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
+
+# Don't prepend wrapper library name with lib and add to Python libs.
+set_target_properties(deep_smp_module PROPERTIES
+        PREFIX "_"
+        SUFFIX ".so"
+        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
+        )
+set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 14)
+
+
+# for all test
+add_executable(
+    test_mpc
+    src/tests/test_mpc.cpp
+    #${MPC_SOURCE}
+    )
+target_link_libraries(test_mpc CEMMPC)
 
 add_executable(test_deep_smp_mpc_sst
     src/tests/test_deep_smp_mpc_sst.cpp
-    #${SOURCE_FILES}
-    #${MPC_SOURCE}
+    ${DEEP_SMP_MODULE}
     )
 
 target_link_libraries(
     test_deep_smp_mpc_sst   
     ${TORCH_LIBRARIES}
-    ${PROJECT_NAME}
-    cemmpc
+    CEMMPC
     )
-set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
+
 set_property(TARGET test_deep_smp_mpc_sst PROPERTY CXX_STANDARD 14)
 
 
-SET(CMAKE_BUILD_TYPE "Debug")
-SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
-SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")

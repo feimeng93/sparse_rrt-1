@@ -1,5 +1,7 @@
 #include "trajectory_optimizers/cem.hpp"
 
+// #define DEBUG
+
 namespace trajectory_optimizers{
     void CEM::solve(const double* start, const double* goal, double* best_u, double* best_t){
         // initialize 
@@ -32,10 +34,13 @@ namespace trajectory_optimizers{
 
         // double* best_u = new double[c_dim];
         // begin loop
-        for(unsigned int it = 0; it < it_max; it++){
+        for(unsigned int it = 0; it < it_max*100; it++){
             // reset active_mask in every iteration
             for(unsigned int si = 0; si < number_of_samples; si++){
                 active_mask[si] = true;
+                for(unsigned int j = 0; j < s_dim; j++){
+                    states[si * s_dim + j] = start[j];
+                }
             }
             // sampling control and time
             for(unsigned int ti = 0; ti < number_of_t; ti++){
@@ -84,7 +89,7 @@ namespace trajectory_optimizers{
                             (int)(time[si * number_of_t + ti] / dt),
                             &states[si * s_dim],
                             dt)){// collision free
-                                loss.at(si).first += time[si * number_of_t + ti];
+                                // loss.at(si).first += time[si * number_of_t + ti];
                                 // std::cout <<"si="<<si<<",ti="<<ti <<"\t"<<controls[si * number_of_t * c_dim + ti]<<std::endl;    
                                 // loss.at(si).first += system -> get_loss(
                                 //     &states[si*s_dim], goal, weight
@@ -99,6 +104,7 @@ namespace trajectory_optimizers{
                         }
                         else{ // collision
                             loss.at(si).first += 1e3;
+                            active_mask[si] = false;
                         }
                     }
                 }
@@ -106,9 +112,25 @@ namespace trajectory_optimizers{
             for(unsigned int si = 0; si < number_of_samples; si++){ // terminal_loss
                 loss.at(si).first += system -> get_loss(&states[si * s_dim], goal, weight);
             }
-            
+            #ifdef DEBUG
+            for(unsigned int si = 0; si < number_of_samples; si++){
+                std::cout<< "si=" <<loss.at(si).first<< "\tid=" <<loss.at(si).second<<"\t"<<
+                    states[si * s_dim]<<","<<states[si * s_dim+1] <<","<<states[si * s_dim+2] <<","<<states[si * s_dim+3] <<","<<std::endl;
+                for(unsigned int ti = 0; ti < number_of_t; ti++){
+                    std::cout<<"\t"<<controls[loss.at(si).second * number_of_t+ ti ] << ","<< (int)(time[loss.at(si).second * number_of_t + ti] / dt)<<std::endl;
+                }
+            }
+            #endif
             //update statistics
             sort(loss.begin(), loss.end());
+            #ifdef DEBUG
+            for(unsigned int si = 0; si < number_of_samples; si++){
+                std::cout<< "si=" <<loss.at(si).first<< "\tid=" <<loss.at(si).second<<std::endl;
+                for(unsigned int ti = 0; ti < number_of_t; ti++){
+                    std::cout<<"\t"<<controls[loss.at(si).second * number_of_t+ ti ] << ","<< (int)(time[loss.at(si).second * number_of_t + ti] / dt)<<std::endl;
+                }
+            }
+            #endif
 
             // early stop checking
             if(loss.at(0).first < min_loss){
@@ -120,7 +142,9 @@ namespace trajectory_optimizers{
                         best_u[ti*c_dim + ci] = controls[si * number_of_t * c_dim + ti * c_dim + ci];
                     }
                     best_t[ti] = time[si* number_of_t + ti];
-                    // std::cout <<  best_u[ti*c_dim + 0] <<","<< best_t[ti]<<std::endl;
+                    #ifdef DEBUG
+                        std::cout << "storing: ti="<<ti<<"\tu=" << best_u[ti*c_dim + 0] <<",\t t="<< best_t[ti]<<std::endl;
+                    #endif
                 }
 
             } else{

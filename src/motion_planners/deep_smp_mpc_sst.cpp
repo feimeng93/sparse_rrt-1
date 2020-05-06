@@ -391,42 +391,35 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
     unsigned int best_i = 0;
 
     for(unsigned int ti = 0; ti < cem -> get_num_step(); ti++){ // propagate
-        if (!system -> propagate(state, 
+        if (system -> propagate(state, 
             this->state_dimension, 
             &solution_u[ti], 
             this->control_dimension, 
             (int)(solution_t[ti]/integration_step), 
             state,
             integration_step)){
-                delete solution_u;
-                delete solution_t;
-                delete state;
-                delete costs;
+               double current_loss = system -> get_loss(state, sample, cem -> weight);
                 #ifdef DEBUG_CEM
-                    std::cout<<"collision" <<std::endl;
+                    std::cout<<"current_loss:" << current_loss <<std::endl;
                 #endif
-                return -1;
-                break;
-            }
-        
-        double current_loss = system -> get_loss(state, sample, cem -> weight);
-        #ifdef DEBUG_CEM
-            std::cout<<"current_loss:" << current_loss <<std::endl;
-        #endif
-        if (current_loss < min_loss){//update min_loss
-            min_loss = current_loss;
-            best_i = ti;
-            for(unsigned int si = 0; si < this->state_dimension; si++){// save best state
-                terminal_state[si] = state[si]; 
-            }
-            if (min_loss < cem -> converge_radius ){
-                    break;
-            }
-            #ifdef DEBUG_CEM
-                std::cout<<"min_loss:" << min_loss <<std::endl;
-            #endif
+                costs[ti] = integration_step * (int)(solution_t[ti]/integration_step); // logging costs
+                if (current_loss < min_loss || this->distance(state, goal_state, this->state_dimension) < goal_radius){//update min_loss
+                    min_loss = current_loss;
+                    best_i = ti;
+                    for(unsigned int si = 0; si < this->state_dimension; si++){// save best state
+                        terminal_state[si] = state[si]; 
+                    }
+                    if (min_loss < cem -> converge_radius){
+                            break;
+                    }
+                    #ifdef DEBUG_CEM
+                        std::cout<<"min_loss:" << min_loss <<std::endl;
+                    #endif
+                }        
         }
-        costs[ti] = integration_step * (int)(solution_t[ti]/integration_step); // logging costs
+        else{
+            break;
+        } 
     }
     for(unsigned int ti = 0; ti <= best_i; ti++){    // compute duration until best duration
         duration += costs[ti];
@@ -459,22 +452,32 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
      * connect the start node to the sample node with trajectory optimization
      * If resulting state is valid, add a resulting state into the tree and perform sst-specific graph manipulations
      */
+
     double* sample_state = new double[this->state_dimension];
     double* neural_sample_state = new double[this->state_dimension];
     double* terminal_state = new double[this->state_dimension];
+    double prob = this->random_generator.uniform_random(0, 1);
+    if (prob < 0.2){
+        for (unsigned int i = 0; i < state_dimension; i++){
+            sample_state[i] = goal_state[i];
+        }
+    }
+    else{
+	    this->random_state(sample_state);
+        sst_node_t* nearest = nearest_vertex(sample_state);
+        //  add neural sampling 
+        neural_sample(system, nearest->get_point(), neural_sample_state, env_vox); 
+        // steer func
+        
+        double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);
+        // std::cout<<"duration:" << duration << std::endl;    
 
-	this->random_state(sample_state);
-    sst_node_t* nearest = nearest_vertex(sample_state);
-    //  add neural sampling 
-    neural_sample(system, nearest->get_point(), neural_sample_state, env_vox); 
-    // steer func
-    double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);
-    // std::cout<<"duration:" << duration << std::endl;    
-
-	if(duration > 0)
-	{
-		add_to_tree(terminal_state, 0, nearest, duration);
-	}
+        if(duration > 0)
+        {
+            add_to_tree(terminal_state, 0, nearest, duration);
+        }
+    }
+    
     delete sample_state;
     delete neural_sample_state;
     delete terminal_state;

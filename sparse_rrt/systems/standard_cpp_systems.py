@@ -1,6 +1,6 @@
 from sparse_rrt import _sst_module
 import numpy as np
-
+from sparse_rrt import _steer_module
 
 class WithEuclideanDistanceComputer(object):
     '''
@@ -34,5 +34,11 @@ class TwoLinkAcrobot(_sst_module.TwoLinkAcrobot):
     '''
     Acrobot has its own custom distance for faster convergence
     '''
+    def distance_computer(self):
+        return _sst_module.TwoLinkAcrobotDistance()
+
+class TwoLinkAcrobotObs(_steer_module.RectangleObsSystem):
+    def __init__(self, obs_list, width):
+        super(TwoLinkAcrobotObs, self).__init__(obs_list, width, "acrobot")
     def distance_computer(self):
         return _sst_module.TwoLinkAcrobotDistance()

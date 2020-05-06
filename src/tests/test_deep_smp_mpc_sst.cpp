@@ -34,12 +34,13 @@ int main(){
         mu_t = 0.1,
         std_t = 0.2,
         t_max = 0.5,
-        dt = 2e-2;
+        dt = 2e-2,
+        step_size = 0.5;
     trajectory_optimizers::CEM cem(model, ns, nt,               
                     ne, converge_r, 
                     mu_u, std_u, 
                     mu_t, std_t, t_max, 
-                    dt, loss_weights, max_it, true);
+                    dt, loss_weights, max_it, true, step_size);
     
     deep_smp_mpc_sst_t* planner;
 

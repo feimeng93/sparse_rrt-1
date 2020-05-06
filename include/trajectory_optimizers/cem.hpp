@@ -14,7 +14,7 @@ namespace trajectory_optimizers{
                 unsigned int number_of_elite, double converge_r, 
                 double control_means, double control_stds, 
                 double time_means, double time_stds, double max_duration,
-                double integration_step, double* loss_weights, unsigned int max_iteration, bool verbose){
+                double integration_step, double* loss_weights, unsigned int max_iteration, bool verbose, double step_size){
                     system = model;
                     this -> number_of_samples = number_of_samples;
                     this -> number_of_t = number_of_t;
@@ -37,8 +37,6 @@ namespace trajectory_optimizers{
                     time = new double[number_of_samples * number_of_t];
                     // states for rolling
                     current_state = new double[s_dim];
-                    weight = loss_weights;
-                    it_max = max_iteration;
                     this -> verbose = verbose;
                     converge_radius = converge_r;
                     
@@ -48,6 +46,13 @@ namespace trajectory_optimizers{
                     sum_of_time = new double[number_of_t];
                     sum_of_square_time = new double[number_of_t];
                     active_mask = new bool[number_of_samples];
+                    step_size = step_size;
+                    it_max = max_iteration;
+                    weight = new double[s_dim];
+                    for(unsigned int si = 0; si < s_dim; si++){
+                        weight[si] = loss_weights[si];
+                    }
+
             }
             ~CEM(){
                 delete mu_u;
@@ -95,6 +100,7 @@ namespace trajectory_optimizers{
             double *sum_of_square_controls;
             double *sum_of_time;
             double *sum_of_square_time;
+            double step_size;
     };
 }
 
