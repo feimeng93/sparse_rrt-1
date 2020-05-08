@@ -453,9 +453,9 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
      * If resulting state is valid, add a resulting state into the tree and perform sst-specific graph manipulations
      */
 
-    double* sample_state = new double[this->state_dimension];
-    double* neural_sample_state = new double[this->state_dimension];
-    double* terminal_state = new double[this->state_dimension];
+    double* sample_state = new double[this->state_dimension]();
+    double* neural_sample_state = new double[this->state_dimension]();
+    double* terminal_state = new double[this->state_dimension]();
     double prob = this->random_generator.uniform_random(0, 1);
     if (prob < 0.2){
         for (unsigned int i = 0; i < state_dimension; i++){
