@@ -6,8 +6,12 @@
 
 #include "motion_planners/deep_smp_mpc_sst.hpp"
 
+#include "networks/mpnet.hpp"
+#include "networks/mpnet_cost.hpp"
+
 #include <torch/script.h>
 #include <iostream>
+#include <string>
 
 using namespace std;
 
@@ -16,13 +20,8 @@ int main(){
     double width = 5;
     obs_list.push_back(std::vector<double> {100.0, 200.0});
     enhanced_system_t* model = new two_link_acrobot_obs_t(obs_list, width);
-    // cout<<"hello"<<endl;
-    // trajectory_optimizers::cem_config c = get_default_arobot_cem_config();
-    // trajectory_optimizers::CEM cem(model, c.ns, c.nt,               
-    //                 c.ne, c.converge_r, 
-    //                 c.mu_u, c.std_u, 
-    //                 c.mu_t, c.std_t, c.t_max, 
-    //                 c.dt, c.loss_weights, c.max_it, true);
+   
+    // initialize cem
     double loss_weights[4] = {1, 1, 0.3, 0.3};
     int ns = 1024,
         nt = 5,
@@ -42,6 +41,13 @@ int main(){
                     mu_t, std_t, t_max, 
                     dt, loss_weights, max_it, true, step_size);
     
+    // initialzie mpnet
+    networks::mpnet_cost_t mpnet(
+        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"),
+        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/costnet5000.pt"),
+        5);
+    //  networks::mpnet_t mpnet(
+    //     std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"));
     deep_smp_mpc_sst_t* planner;
 
     double in_start[4] = {0, 0, 0, 0};
@@ -59,7 +65,8 @@ int main(){
         two_link_acrobot_obs_t::distance,
         0,
         5e-1, 1e-2,
-        &cem);
+        &cem,
+        &mpnet);
     planner -> step(model, 10, 50, dt);
     const double start[4] = {-0.42044061,  0.96072684, -0.84960626,  2.32958837};
     const double goal[4] = {-0.48999742,  1.20535017, -0.02984635,  0.98378645};

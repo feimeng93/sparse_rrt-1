@@ -33,14 +33,16 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     std::function<double(const double*, const double*, unsigned int)> a_distance_function,
     unsigned int random_seed,
     double delta_near, double delta_drain,
-    trajectory_optimizers::CEM* cem
+    trajectory_optimizers::CEM* cem_ptr,
+    networks::mpnet_t *mpnet_ptr
     ) 
     : planner_t(in_start, in_goal, in_radius,
                 a_state_bounds, a_control_bounds, a_distance_function, random_seed)
     , best_goal(nullptr)
     , sst_delta_near(delta_near)
     , sst_delta_drain(delta_drain)
-    , cem(cem)
+    , cem_ptr(cem_ptr)
+    , mpnet_ptr(mpnet_ptr)
 {
     //initialize the metrics
     unsigned int state_dimensions = this->get_state_dimension();
@@ -59,9 +61,6 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     sample_node_t* first_witness_sample = new sample_node_t(static_cast<sst_node_t*>(root), start_state, this->state_dimension);
     samples.add_node(first_witness_sample);
     witness_nodes.push_back(first_witness_sample);
-    // initialize mpnet
-    mpnet_torch_module_ptr.reset(new torch::jit::script::Module(
-        torch::jit::load("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/cpp/output/mpnet5000.pt")));
 }
 
 deep_smp_mpc_sst_t::~deep_smp_mpc_sst_t() {
@@ -69,9 +68,6 @@ deep_smp_mpc_sst_t::~deep_smp_mpc_sst_t() {
     for (auto w: this->witness_nodes) {
         delete w;
     }
-    mpnet_torch_module_ptr.reset();
-
-
 }
 
 
@@ -314,54 +310,8 @@ bool deep_smp_mpc_sst_t::is_best_goal(tree_node_t* v)
 
 }
 
-void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor& env_vox_tensor){
-    // TODO: add neural sampling
-    // update input
-    double* normalized_state = new double[this->state_dimension];
-    double* normalized_goal = new double[this->state_dimension];
-    double* normalized_neural_sample_state = new double[this->state_dimension];
-    // normalize
-    system -> normalize(nearest, normalized_state);
-    system -> normalize(goal_state, normalized_goal);
-
-    torch::Tensor state_goal_tensor = torch::ones({1, 8}).to(at::kCUDA); 
-    std::vector<torch::jit::IValue> mpnet_input_container;
-
-    // set value state_goal with dim 1 x 8
-    for(unsigned int si = 0; si < this->state_dimension; si++){
-        state_goal_tensor[0][si] = normalized_state[si]; 
-    }
-    for(unsigned int si = 0; si < this->state_dimension; si++){
-        state_goal_tensor[0][si+this->state_dimension] = normalized_goal[si]; 
-    }
-    #ifdef DEBUG_MPNET
-    for(size_t i = 0; i < 8; i++){
-        std::cout << (state_goal_tensor[0][i].item<float>())<< ",";
-    }
-    std::cout << std::endl;
-
-    #endif
-    mpnet_input_container.push_back(state_goal_tensor);
-    mpnet_input_container.push_back((env_vox_tensor));
-    // feed forward network
-    at::Tensor output = mpnet_torch_module_ptr -> forward(mpnet_input_container).toTensor();
-    // convert to pointers
-    for(unsigned int si = 0; si < this->state_dimension; si++){
-        normalized_neural_sample_state[si] = output[0][si].item<double>();
-    }
-    #ifdef DEBUG_MPNET
-    for(size_t i = 0; i < 4; i++){
-        std::cout << (output[0][i].item<float>())<< ",";
-    }
-    std::cout << std::endl;
-    #endif
-    
-    // denormalize
-    system -> denormalize(normalized_neural_sample_state, neural_sample_state);
-
-    delete normalized_state;
-    delete normalized_goal;
-    delete normalized_neural_sample_state;
+void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor){
+    mpnet_ptr->mpnet_sample(system, env_vox_tensor, nearest, goal_state, neural_sample_state);
 }
 
 double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start, const double* sample, 
@@ -378,11 +328,11 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
     }
     std::cout << std::endl;
     #endif
-    double* solution_u = new double[cem -> get_control_dimension()];
-    double* solution_t = new double[cem -> get_num_step()];
-    double* costs = new double[cem -> get_num_step()];
+    double* solution_u = new double[cem_ptr -> get_control_dimension()];
+    double* solution_t = new double[cem_ptr -> get_num_step()];
+    double* costs = new double[cem_ptr -> get_num_step()];
     double* state = new double[this->state_dimension];
-    cem -> solve(start, sample, solution_u, solution_t);
+    cem_ptr -> solve(start, sample, solution_u, solution_t);
     double duration = 0;
     for(unsigned int si = 0; si < this->state_dimension; si++){ //copy start state
         state[si] = start[si]; 
@@ -390,7 +340,7 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
     double min_loss = 1e3;// initialize logging variables
     unsigned int best_i = 0;
 
-    for(unsigned int ti = 0; ti < cem -> get_num_step(); ti++){ // propagate
+    for(unsigned int ti = 0; ti < cem_ptr -> get_num_step(); ti++){ // propagate
         if (system -> propagate(state, 
             this->state_dimension, 
             &solution_u[ti], 
@@ -398,7 +348,7 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
             (int)(solution_t[ti]/integration_step), 
             state,
             integration_step)){
-               double current_loss = system -> get_loss(state, sample, cem -> weight);
+               double current_loss = system -> get_loss(state, sample, cem_ptr -> weight);
                 #ifdef DEBUG_CEM
                     std::cout<<"current_loss:" << current_loss <<std::endl;
                 #endif
@@ -409,7 +359,7 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
                     for(unsigned int si = 0; si < this->state_dimension; si++){// save best state
                         terminal_state[si] = state[si]; 
                     }
-                    if (min_loss < cem -> converge_radius){
+                    if (min_loss < cem_ptr -> converge_radius){
                             break;
                     }
                     #ifdef DEBUG_CEM
@@ -442,7 +392,7 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
 }
 
 
-void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox)
+void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox)
 {
     //TODO: implement neural step
     /*

@@ -5,6 +5,10 @@
 
 #include "systems/two_link_acrobot_obs_t.hpp"
 #include "trajectory_optimizers/cem.hpp"
+
+#include "networks/mpnet.hpp"
+#include "networks/mpnet_cost.hpp"
+
 #include "motion_planners/deep_smp_mpc_sst.hpp"
 
 namespace pybind11 {
@@ -34,6 +38,7 @@ public:
             const py::safe_array<double> &obs_list_array,
             double width,
             bool verbose,
+            std::string mpnet_weight_path, std::string costnet_weight_path, int num_sample,
             int ns, int nt, int ne, int max_it,
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step
     ){
@@ -59,8 +64,12 @@ public:
 
         system = new two_link_acrobot_obs_t(obs_list, width);
 
-       
         dt = integration_step;
+        
+        mpnet.reset(
+            new networks::mpnet_cost_t(mpnet_weight_path, costnet_weight_path, num_sample)
+            //  new networks::mpnet_t(mpnet_weight_path)
+        );
         
         cem.reset(
             new trajectory_optimizers::CEM(
@@ -78,7 +87,9 @@ public:
                     system->get_control_bounds(),
                     two_link_acrobot_obs_t::distance,
                     random_seed,
-                    sst_delta_near, sst_delta_drain, cem.get())
+                    sst_delta_near, sst_delta_drain, 
+                    cem.get(),
+                    mpnet.get())
         );
     }
 
@@ -97,7 +108,7 @@ public:
             obs_vec.push_back(float(obs_voxel_data(i)));
         }
         //std::cout << "vector to torch obs vector.." << std::endl;
-        torch::Tensor obs_tensor = torch::from_blob(obs_vec.data(), {1,1,32,32}).to(at::kCUDA);
+        torch::Tensor obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
         planner -> neural_step(system, dt, obs_tensor);
 
     }
@@ -172,6 +183,9 @@ public:
 protected:
     enhanced_system_t *system;
     std::unique_ptr<trajectory_optimizers::CEM> cem;
+    std::unique_ptr<networks::mpnet_t> mpnet;
+    // std::unique_ptr<networks::mpnet_cost_t> mpnet;
+
     std::unique_ptr<deep_smp_mpc_sst_t> planner;
     sst_node_t* nearest;
     std::vector<std::vector<double>> obs_list;
@@ -200,6 +214,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             const py::safe_array<double>&,
             double,
             bool,
+            std::string, std::string, int,
             int, int, int, int,
             double, double, double, double, double, double, double, double>(),
             "start_state"_a,
@@ -211,6 +226,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "obs_list"_a,
             "width"_a,
             "verbose"_a,
+            "mpnet_weight_path"_a, "cost_predictor_weight_path"_a, "num_sample"_a,
             "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
             "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a
         )

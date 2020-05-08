@@ -25,12 +25,17 @@
 #include "motion_planners/sst.hpp"
 #endif
 
-#ifndef TORCH_H
-#include <torch/script.h>
-#endif
 
 #ifndef CEM_HPP
 #include "trajectory_optimizers/cem.hpp"
+#endif
+
+#ifndef MPNET_HPP
+#include "networks/mpnet.hpp"
+#endif
+
+#ifndef COST_PREDICTOR_HPP
+#include "networks/cost_predictor.hpp"
 #endif
 
 #include <string>
@@ -56,14 +61,15 @@ public:
 	 * @param delta_drain Drain distance threshold for SST
 	 */
 	deep_smp_mpc_sst_t(const double* in_start, const double* in_goal,
-	      double in_radius,
-	      const std::vector<std::pair<double, double>>& a_state_bounds,
-		  const std::vector<std::pair<double, double>>& a_control_bounds,
-		  std::function<double(const double*, const double*, unsigned int)> distance_function,
-		  unsigned int random_seed,
-		  double delta_near, double delta_drain,
-		  trajectory_optimizers::CEM* cem
-);
+		double in_radius,
+		const std::vector<std::pair<double, double>>& a_state_bounds,
+		const std::vector<std::pair<double, double>>& a_control_bounds,
+		std::function<double(const double*, const double*, unsigned int)> distance_function,
+		unsigned int random_seed,
+		double delta_near, double delta_drain,
+		trajectory_optimizers::CEM* cem,
+		networks::mpnet_t *mpnet
+	);
 	virtual ~deep_smp_mpc_sst_t();
 
 	/**
@@ -81,7 +87,7 @@ public:
 	/**
 	 * @copydoc planner_t::step()
 	 */
-	 virtual void neural_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox_tensor);
+	 virtual void neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox_tensor);
 	
 	// Expose two functions public to enable the python wrappers to call 
 	/**
@@ -108,14 +114,9 @@ public:
 	 * @brief sample a point with neural network
 	 * @details sample a point with neural network
 	 */
-	virtual void neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor& env_vox_tensor);
-
+	virtual void neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor);
+	
 protected:
-	/**
-     * @brief loaded neural network
-     */
-	std::shared_ptr<torch::jit::script::Module> mpnet_torch_module_ptr;
-
     /**
      * @brief The nearest neighbor data structure.
      */
@@ -129,7 +130,12 @@ protected:
 	/**
 	 * @brief The best goal node found so far.
 	 */
-	trajectory_optimizers::CEM* cem;
+	trajectory_optimizers::CEM* cem_ptr;
+
+	/**
+     * @brief The MPNet Pointer.
+     */
+	networks::mpnet_t *mpnet_ptr;
 	/**
 	 * @brief Check if the currently created state is close to a witness.
 	 * @details Check if the currently created state is close to a witness.

@@ -128,6 +128,8 @@ set_target_properties(steer_module PROPERTIES
 set(DEEP_SMP_MODULE
     ${PLANNING_UTILS}
     src/motion_planners/sst.cpp
+    src/networks/mpnet.cpp
+    src/networks/mpnet_cost.cpp
     src/motion_planners/deep_smp_mpc_sst.cpp
 )
 
