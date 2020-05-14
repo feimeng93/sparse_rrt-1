@@ -310,8 +310,8 @@ bool deep_smp_mpc_sst_t::is_best_goal(tree_node_t* v)
 
 }
 
-void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor){
-    mpnet_ptr->mpnet_sample(system, env_vox_tensor, nearest, goal_state, neural_sample_state);
+void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine){
+    mpnet_ptr->mpnet_sample(system, env_vox_tensor, nearest, goal_state, neural_sample_state, refine);
 }
 
 double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start, const double* sample, 
@@ -392,7 +392,7 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
 }
 
 
-void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox)
+void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox, bool refine)
 {
     //TODO: implement neural step
     /*
@@ -416,7 +416,7 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
 	    this->random_state(sample_state);
         sst_node_t* nearest = nearest_vertex(sample_state);
         //  add neural sampling 
-        neural_sample(system, nearest->get_point(), neural_sample_state, env_vox); 
+        neural_sample(system, nearest->get_point(), neural_sample_state, env_vox, refine); 
         // steer func
         
         double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);

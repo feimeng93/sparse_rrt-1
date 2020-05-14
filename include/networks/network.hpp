@@ -9,7 +9,6 @@ namespace networks{
     class network_t
     {
     public:
-    
         network_t(std::string network_weights_path){
             // initialize network
             if(network_weights_path == ""){

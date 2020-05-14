@@ -6,8 +6,8 @@
 #define DEBUG
 namespace networks{
     mpnet_cost_t::mpnet_cost_t(std::string network_weights_path, 
-        std::string cost_predictor_weights_path, int num_sample) : mpnet_t(network_weights_path),
-        num_sample(num_sample)
+        std::string cost_predictor_weights_path, int num_sample, std::string device_id, float refine_lr) : mpnet_t(network_weights_path),
+        num_sample(num_sample), device_id(device_id), refine_lr(refine_lr)
         {
             if(network_weights_path.length() == 0){
                 network_weights_path = "/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt";
@@ -19,6 +19,8 @@ namespace networks{
             }
             cost_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(cost_predictor_weights_path)));
+            network_torch_module_ptr->to(torch::Device(device_id));;
+            cost_predictor_torch_module_ptr->to(torch::Device(device_id));
     }
 
     mpnet_cost_t::~mpnet_cost_t(){
@@ -34,49 +36,55 @@ namespace networks{
         return cost_predictor_torch_module_ptr -> forward(input_container).toTensor();
     }
 
+    
     void mpnet_cost_t::mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor,
-        const double* state, double* goal_state, double* neural_sample_state){
+        const double* state, double* goal_state, double* neural_sample_state, bool refine){
         double* normalized_state = new double[system->get_state_dimension()];
         double* normalized_goal = new double[system->get_state_dimension()];
         double* normalized_neural_sample_state = new double[system->get_state_dimension()];
         system -> normalize(state, normalized_state);
         system -> normalize(goal_state, normalized_goal);
         std::vector<torch::jit::IValue> input_container;
-        torch::Tensor state_goal_tensor = torch::ones({1, 8}).to(at::kCUDA); 
-
+        torch::Tensor state_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
+        torch::Tensor goal_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
         // set value state_goal with dim 1 x 8
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-            state_goal_tensor[0][si] = normalized_state[si];    
+            state_tensor[0][si] = normalized_state[si];    
         }
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-            state_goal_tensor[0][si + system->get_state_dimension()] = normalized_goal[si]; 
+            goal_tensor[0][si] = normalized_goal[si]; 
         }
+        
+        at::Tensor state_tensor_expand = state_tensor.repeat({num_sample, 1}).to(torch::Device(device_id));
+        at::Tensor goal_tensor_expand = goal_tensor.repeat({num_sample, 1}).to(torch::Device(device_id));
 
+        torch::Tensor state_goal_tensor = at::cat({state_tensor_expand, goal_tensor_expand}, 1).to(torch::Device(device_id));
         // for multiple sampling
-        at::Tensor state_goal_tensor_expand = state_goal_tensor.repeat({num_sample, 1});
-        at::Tensor env_vox_tensor_expand = env_vox_tensor.repeat({num_sample, 1, 1, 1});
-        // 
-        #ifdef DEBUG
-        // for(unsigned int si = 0; si < 32; si++){
-        //     std::cout << env_vox_tensor[0][0][0][si]<< std::endl; 
-        // }
-        #endif
-        input_container.push_back(state_goal_tensor_expand);
+        at::Tensor env_vox_tensor_expand = env_vox_tensor.repeat({num_sample, 1, 1, 1}).to(torch::Device(device_id));
+        input_container.push_back(state_goal_tensor);
         input_container.push_back(env_vox_tensor_expand);
-        at::Tensor output = this -> forward(input_container);
-        for(unsigned int di = 0; di < num_sample; di++){
-            for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-                state_goal_tensor_expand[di][si] = output[di][si]; 
-            }
+        at::Tensor predicted_state_tensor = this -> forward(input_container).to(torch::Device(device_id));
+        at::Tensor cost_input;
+        // refining goes here
+        if(refine){
+            torch::Tensor predicted_state_var= torch::autograd::Variable(predicted_state_tensor.clone()).detach().set_requires_grad(true);
+            cost_input = at::cat({predicted_state_var, goal_tensor_expand}, 1).to(torch::Device(device_id));
+            input_container.at(0) = cost_input;
+            at::Tensor predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
+            predicted_costs.sum().backward();
+            if(predicted_costs.sum().item<float>() > 5e-2){
+                torch::Tensor refine=predicted_state_var.grad().to(torch::Device(device_id));
+                predicted_state_tensor = predicted_state_tensor - refine_lr * refine;
+            }            
         }
-        at::Tensor predicted_costs = this -> forward_cost(input_container);
-        at::Tensor best_index_tensor = at::argmin(predicted_costs);
+        cost_input = at::cat({predicted_state_tensor, goal_tensor_expand}, 1).to(torch::Device(device_id));
+        input_container.at(0) = cost_input;
+        at::Tensor predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
+        at::Tensor best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
         unsigned int best_index = best_index_tensor.item<int>();
-        // int best_index = 0;
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-            normalized_neural_sample_state[si] = output[best_index][si].item<double>();
+            normalized_neural_sample_state[si] = predicted_state_tensor[best_index][si].item<double>();
         }
-       
         system -> denormalize(normalized_neural_sample_state, neural_sample_state);
         delete normalized_state;
         delete normalized_goal;
@@ -84,3 +92,22 @@ namespace networks{
     }
 
 }
+
+
+// torch::Tensor rand2= torch::autograd::Variable(rand.clone()).detach().set_requires_grad(true);  //rand is basically mpnet output, we convert it to variable that requires grad
+// torch::Tensor dnet_input= torch::cat({voxel, ohot, rand2},1).to(torch::Device(device_id)); // making it as input for the cost-to-go function (dnet)
+// inputs_dnet.push_back(dnet_input);
+// torch::Tensor dnet = dnet.forward(inputs_dnet).toTensor();
+// //dout is basically the predicted cost
+// dout.backward(); // next you run backward pass so that the repair as the gradients in it
+// torch::Tensor repair=rand2.grad();
+// // this is how we project using the gradiants
+// dout = dout.to(at::kCPU);
+// auto dout_vec= dout.accessor<float,2>();
+// if (((dReal)dout_vec[0][0])>0.3)
+// {	
+//     rand=rand-0.4*(repair);
+// }
+// 	rand = rand.to(at::kCPU);
+// to_vector(rand, _randomConfig);
+// setlimits(_randomConfig);

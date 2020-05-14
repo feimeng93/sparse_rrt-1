@@ -1,6 +1,8 @@
 import sys
 sys.path.append('/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/deps/sparse_rrt-1')
-from sparse_rrt import _sst_module
+sys.path.append('/media/arclabdl1/HD1/Linjun/mpc-mpnet-py')
+
+from sparse_rrt import _deep_smp_module
 from sparse_rrt.systems import standard_cpp_systems
 
 import pickle
@@ -21,9 +23,9 @@ path = data['path']
 obs_list = pickle.load(open(filepath, "rb")).reshape(-1, 2)
 width = 6
 
-env_vox = np.load("mpnet/sst_envs/acrobot_obs_env_vox.npy")
+env_vox = np.load("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/sst_envs/acrobot_obs_env_vox.npy")
 obc = env_vox[env_id, 0]
-planner = _sst_module.DSSTMPCWrapper(
+planner = _deep_smp_module.DSSTMPCWrapper(
             start_state=np.array(path[0]),
             goal_state=np.array(path[-1]),
             goal_radius=10,
@@ -32,8 +34,13 @@ planner = _sst_module.DSSTMPCWrapper(
             sst_delta_drain=1e-1,
             obs_list=obs_list,
             width=width,
-            verbose=False
-        )
+            verbose=False,
+            mpnet_weight_path="/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet//exported/output/mpnet5000.pt", 
+            cost_predictor_weight_path="/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/costnet5000.pt", 
+            num_sample=3,
+            ns=32, nt=5, ne=4, max_it=10,
+            converge_r=0.1, mu_u=0, std_u=4, mu_t=0.1, 
+            std_t=0.5, t_max=0.5, step_size=0.75, integration_step=2e-2)
 min_time_steps, max_time_steps = 10, 50
 number_of_iterations = 1000
 integration_step = 2e-2

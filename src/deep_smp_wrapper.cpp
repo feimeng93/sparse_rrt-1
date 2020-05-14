@@ -40,7 +40,8 @@ public:
             bool verbose,
             std::string mpnet_weight_path, std::string costnet_weight_path, int num_sample,
             int ns, int nt, int ne, int max_it,
-            double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step
+            double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
+            std::string device_id, float refine_lr
     ){
         auto start_state = start_state_array.unchecked<1>();
         auto goal_state = goal_state_array.unchecked<1>();
@@ -67,7 +68,7 @@ public:
         dt = integration_step;
         
         mpnet.reset(
-            new networks::mpnet_cost_t(mpnet_weight_path, costnet_weight_path, num_sample)
+            new networks::mpnet_cost_t(mpnet_weight_path, costnet_weight_path, num_sample, device_id, refine_lr)
             //  new networks::mpnet_t(mpnet_weight_path)
         );
         
@@ -89,7 +90,8 @@ public:
                     random_seed,
                     sst_delta_near, sst_delta_drain, 
                     cem.get(),
-                    mpnet.get())
+                    mpnet.get()
+                    )
         );
     }
 
@@ -100,7 +102,7 @@ public:
         planner->step(system, min_time_steps, max_time_steps, integration_step);
     }
 
-    void neural_step(py::safe_array<double>& obs_voxel_array) {
+    void neural_step(py::safe_array<double>& obs_voxel_array, bool refine) {
         auto obs_voxel_data = obs_voxel_array.unchecked<1>();
         std::vector<float> obs_vec;
         for (unsigned i=0; i < obs_voxel_data.shape(0); i++)
@@ -109,7 +111,9 @@ public:
         }
         //std::cout << "vector to torch obs vector.." << std::endl;
         torch::Tensor obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
-        planner -> neural_step(system, dt, obs_tensor);
+        planner -> neural_step(system, dt, obs_tensor, refine);
+  
+      
 
     }
 
@@ -216,7 +220,8 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             bool,
             std::string, std::string, int,
             int, int, int, int,
-            double, double, double, double, double, double, double, double>(),
+            double, double, double, double, double, double, double, double,
+            std::string, float>(),
             "start_state"_a,
             "goal_state"_a,
             "goal_radius"_a,
@@ -228,7 +233,8 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "verbose"_a,
             "mpnet_weight_path"_a, "cost_predictor_weight_path"_a, "num_sample"_a,
             "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
-            "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a
+            "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a,
+            "device_id"_a, "refine_lr"_a=0.2
         )
         .def("step", &DSSTMPCWrapper::step,
             "min_time_steps"_a,
@@ -243,7 +249,8 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "duration"_a
         )
         .def("neural_step", &DSSTMPCWrapper::neural_step,
-            "obs_voxel_array"_a
+            "obs_voxel_array"_a,
+            "refine"_a=false
         )
         .def("get_solution", &DSSTMPCWrapper::get_solution)
         .def("get_number_of_nodes", &DSSTMPCWrapper::get_number_of_nodes)

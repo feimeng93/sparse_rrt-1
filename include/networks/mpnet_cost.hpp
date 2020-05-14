@@ -8,12 +8,19 @@ namespace networks{
     class mpnet_cost_t : public mpnet_t
     {
     public:
-        mpnet_cost_t(std::string network_weights_path, std::string cost_predictor_weights_path, int num_sample);
+        mpnet_cost_t(std::string network_weights_path, std::string cost_predictor_weights_path, 
+            int num_sample, 
+            std::string device_id,
+            float refine_lr);
         at::Tensor forward(std::vector<torch::jit::IValue> input_container);
         at::Tensor forward_cost(std::vector<torch::jit::IValue> input_container);
-        virtual void mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor, 
-            const double* state,  double* goal_state, double* neural_sample_state) override;
+        // virtual void mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor, 
+        //     const double* state,  double* goal_state, double* neural_sample_state) override;
+        void mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor, 
+            const double* state,  double* goal_state, double* neural_sample_state, bool refine);
         int num_sample;
+        std::string device_id;
+        float refine_lr;
         ~mpnet_cost_t();
     protected:
         std::shared_ptr<torch::jit::script::Module> network_torch_module_ptr;

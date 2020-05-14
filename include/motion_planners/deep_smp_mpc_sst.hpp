@@ -1,5 +1,5 @@
 /**
- * @file sst.hpp
+ * @file deep_smp_mpc_sst.hpp
  *
  * @copyright Software License Agreement (BSD License)
  * Original work Copyright (c) 2014, Rutgers the State University of New Jersey, New Brunswick
@@ -87,7 +87,7 @@ public:
 	/**
 	 * @copydoc planner_t::step()
 	 */
-	 virtual void neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox_tensor);
+	 virtual void neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox_tensor, bool refine);
 	
 	// Expose two functions public to enable the python wrappers to call 
 	/**
@@ -114,7 +114,7 @@ public:
 	 * @brief sample a point with neural network
 	 * @details sample a point with neural network
 	 */
-	virtual void neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor);
+	virtual void neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine);
 	
 protected:
     /**
