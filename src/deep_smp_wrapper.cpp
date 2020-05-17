@@ -102,7 +102,9 @@ public:
         planner->step(system, min_time_steps, max_time_steps, integration_step);
     }
 
-    void neural_step(py::safe_array<double>& obs_voxel_array, bool refine) {
+    void neural_step(py::safe_array<double>& obs_voxel_array,
+        bool refine, float refine_threshold, bool using_one_step_cost,
+        bool cost_reselection) {
         auto obs_voxel_data = obs_voxel_array.unchecked<1>();
         std::vector<float> obs_vec;
         for (unsigned i=0; i < obs_voxel_data.shape(0); i++)
@@ -111,7 +113,7 @@ public:
         }
         //std::cout << "vector to torch obs vector.." << std::endl;
         torch::Tensor obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
-        planner -> neural_step(system, dt, obs_tensor, refine);
+        planner -> neural_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection);
   
       
 
@@ -187,7 +189,7 @@ public:
 protected:
     enhanced_system_t *system;
     std::unique_ptr<trajectory_optimizers::CEM> cem;
-    std::unique_ptr<networks::mpnet_t> mpnet;
+    std::unique_ptr<networks::mpnet_cost_t> mpnet;
     // std::unique_ptr<networks::mpnet_cost_t> mpnet;
 
     std::unique_ptr<deep_smp_mpc_sst_t> planner;
@@ -250,7 +252,10 @@ PYBIND11_MODULE(_deep_smp_module, m) {
         )
         .def("neural_step", &DSSTMPCWrapper::neural_step,
             "obs_voxel_array"_a,
-            "refine"_a=false
+            "refine"_a=false,
+            "refine_threshold"_a=0,
+            "using_one_step_cost"_a=false,
+            "cost_reselection"_a=false
         )
         .def("get_solution", &DSSTMPCWrapper::get_solution)
         .def("get_number_of_nodes", &DSSTMPCWrapper::get_number_of_nodes)

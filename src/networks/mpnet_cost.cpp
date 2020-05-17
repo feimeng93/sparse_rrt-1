@@ -3,7 +3,7 @@
 #endif
 #include <string>
 
-#define DEBUG
+// #define DEBUG
 namespace networks{
     mpnet_cost_t::mpnet_cost_t(std::string network_weights_path, 
         std::string cost_predictor_weights_path, int num_sample, std::string device_id, float refine_lr) : mpnet_t(network_weights_path),
@@ -38,7 +38,8 @@ namespace networks{
 
     
     void mpnet_cost_t::mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor,
-        const double* state, double* goal_state, double* neural_sample_state, bool refine){
+        const double* state, double* goal_state, double* neural_sample_state, bool refine, float refine_threshold,
+        bool using_one_step_cost, bool cost_reselection){
         double* normalized_state = new double[system->get_state_dimension()];
         double* normalized_goal = new double[system->get_state_dimension()];
         double* normalized_neural_sample_state = new double[system->get_state_dimension()];
@@ -65,23 +66,64 @@ namespace networks{
         input_container.push_back(env_vox_tensor_expand);
         at::Tensor predicted_state_tensor = this -> forward(input_container).to(torch::Device(device_id));
         at::Tensor cost_input;
-        // refining goes here
+        at::Tensor predicted_costs;
+        at::Tensor best_index_tensor;
+        torch::Tensor predicted_state_var;
+        // at::Tensor current_cost_to_go;
         if(refine){
-            torch::Tensor predicted_state_var= torch::autograd::Variable(predicted_state_tensor.clone()).detach().set_requires_grad(true);
+            predicted_state_var = torch::autograd::Variable(predicted_state_tensor.clone()).detach().set_requires_grad(true);
+        }else{
+            predicted_state_var = predicted_state_tensor;
+        }
+        if(using_one_step_cost){
+            cost_input = at::cat({state_tensor_expand, predicted_state_var}, 1).to(torch::Device(device_id));
+            input_container.at(0) = cost_input;
+            predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
+            best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
+            
+        } else {// using cost to go
+            // current_cost_to_go = this -> forward_cost(input_container).to(torch::Device(device_id));
             cost_input = at::cat({predicted_state_var, goal_tensor_expand}, 1).to(torch::Device(device_id));
             input_container.at(0) = cost_input;
-            at::Tensor predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
+            predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
+            best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
+        }           
+        // refining goes here
+        if(refine){
             predicted_costs.sum().backward();
-            if(predicted_costs.sum().item<float>() > 5e-2){
-                torch::Tensor refine=predicted_state_var.grad().to(torch::Device(device_id));
-                predicted_state_tensor = predicted_state_tensor - refine_lr * refine;
-            }            
+            torch::Tensor refine_grad = predicted_state_var.grad().to(torch::Device(device_id));
+            torch::Tensor refine_norm = at::norm(refine_grad, 2, 1, true);
+            // std::cout<< refine_norm.sizes()<<std::endl;
+            // for(int i = 0; i < num_sample; i++){
+            //     std::cout<<"norm:\t"<<refine_norm[i].item<double>() << std::endl;
+            // }
+            // refine_grad /= refine_norm;
+            if(using_one_step_cost){
+                // predicted_state_tensor = predicted_state_tensor - refine_lr * refine * ((predicted_costs) > refine_threshold);
+                predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * (refine_norm > refine_threshold);
+            } else{// using cost to go
+                // predicted_state_tensor = predicted_state_tensor - refine_lr * refine * ((current_cost_to_go - predicted_costs) > refine_threshold);
+                predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * (refine_norm > refine_threshold);
+                // predicted_state_tensor = predicted_state_tensor -
+                //     refine_lr * refine_grad * (refine_norm > refine_threshold);
+
+            }
+            
         }
-        cost_input = at::cat({predicted_state_tensor, goal_tensor_expand}, 1).to(torch::Device(device_id));
-        input_container.at(0) = cost_input;
-        at::Tensor predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
-        at::Tensor best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
+       
+        if(cost_reselection){
+            if(using_one_step_cost){
+                cost_input = at::cat({state_tensor_expand, predicted_state_tensor}, 1).to(torch::Device(device_id));
+            }
+            else{
+                cost_input = at::cat({predicted_state_tensor, goal_tensor_expand}, 1).to(torch::Device(device_id));
+            }
+            input_container.at(0) = cost_input;
+            predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
+            best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
+        }
         unsigned int best_index = best_index_tensor.item<int>();
+        
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
             normalized_neural_sample_state[si] = predicted_state_tensor[best_index][si].item<double>();
         }
@@ -90,6 +132,8 @@ namespace networks{
         delete normalized_goal;
         delete normalized_neural_sample_state;
     }
+
+    
 
 }
 

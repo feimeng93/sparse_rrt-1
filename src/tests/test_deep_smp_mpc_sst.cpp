@@ -73,7 +73,7 @@ int main(){
     double * terminal = new double[model->get_state_dimension()];
     double duration = 0;
     // planner -> steer(model, start, goal, &duration, terminal, dt);
-    planner -> neural_step(model, dt, obs, true);
+    // planner -> neural_step(model, dt, obs, true, 0);
 
     return 0;
 }

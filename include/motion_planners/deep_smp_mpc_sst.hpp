@@ -30,8 +30,8 @@
 #include "trajectory_optimizers/cem.hpp"
 #endif
 
-#ifndef MPNET_HPP
-#include "networks/mpnet.hpp"
+#ifndef MPNET_COST_HPP
+#include "networks/mpnet_cost.hpp"
 #endif
 
 #ifndef COST_PREDICTOR_HPP
@@ -68,7 +68,7 @@ public:
 		unsigned int random_seed,
 		double delta_near, double delta_drain,
 		trajectory_optimizers::CEM* cem,
-		networks::mpnet_t *mpnet
+		networks::mpnet_cost_t *mpnet
 	);
 	virtual ~deep_smp_mpc_sst_t();
 
@@ -87,7 +87,8 @@ public:
 	/**
 	 * @copydoc planner_t::step()
 	 */
-	 virtual void neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox_tensor, bool refine);
+	 virtual void neural_step(enhanced_system_t* system, double integration_step, 
+	 	torch::Tensor env_vox_tensor, bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection);
 	
 	// Expose two functions public to enable the python wrappers to call 
 	/**
@@ -114,7 +115,9 @@ public:
 	 * @brief sample a point with neural network
 	 * @details sample a point with neural network
 	 */
-	virtual void neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine);
+	virtual void neural_sample(enhanced_system_t* system, const double* nearest, 
+		double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine, float refine_threshold,
+		bool using_one_step_cost, bool cost_reselection);
 	
 protected:
     /**
@@ -135,7 +138,7 @@ protected:
 	/**
      * @brief The MPNet Pointer.
      */
-	networks::mpnet_t *mpnet_ptr;
+	networks::mpnet_cost_t *mpnet_ptr;
 	/**
 	 * @brief Check if the currently created state is close to a witness.
 	 * @details Check if the currently created state is close to a witness.

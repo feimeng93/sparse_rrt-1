@@ -23,7 +23,7 @@ namespace networks{
     }
 
     void mpnet_t::mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor,
-        const double* state, double* goal_state, double* neural_sample_state, bool refine){
+        const double* state, double* goal_state, double* neural_sample_state){
         double* normalized_state = new double[system->get_state_dimension()];
         double* normalized_goal = new double[system->get_state_dimension()];
         double* normalized_neural_sample_state = new double[system->get_state_dimension()];

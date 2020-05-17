@@ -11,7 +11,7 @@ namespace networks{
         mpnet_t(std::string network_weights_path);
         at::Tensor forward(std::vector<torch::jit::IValue> mpnet_input_container);
         virtual void mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor, 
-            const double* state,  double* goal_state, double* neural_sample_state, bool refine);
+            const double* state,  double* goal_state, double* neural_sample_state);
 
         ~mpnet_t();
     protected:

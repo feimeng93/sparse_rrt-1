@@ -34,7 +34,7 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     unsigned int random_seed,
     double delta_near, double delta_drain,
     trajectory_optimizers::CEM* cem_ptr,
-    networks::mpnet_t *mpnet_ptr
+    networks::mpnet_cost_t *mpnet_ptr
     ) 
     : planner_t(in_start, in_goal, in_radius,
                 a_state_bounds, a_control_bounds, a_distance_function, random_seed)
@@ -310,8 +310,11 @@ bool deep_smp_mpc_sst_t::is_best_goal(tree_node_t* v)
 
 }
 
-void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest, double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine){
-    mpnet_ptr->mpnet_sample(system, env_vox_tensor, nearest, goal_state, neural_sample_state, refine);
+void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest,
+    double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine, float refine_threshold, 
+    bool using_one_step_cost, bool cost_reselection){
+    mpnet_ptr->mpnet_sample(system, env_vox_tensor, nearest, goal_state, neural_sample_state, refine, refine_threshold, 
+        using_one_step_cost, cost_reselection);
 }
 
 double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start, const double* sample, 
@@ -392,7 +395,8 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
 }
 
 
-void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox, bool refine)
+void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox, 
+    bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection)
 {
     //TODO: implement neural step
     /*
@@ -407,7 +411,7 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
     double* neural_sample_state = new double[this->state_dimension]();
     double* terminal_state = new double[this->state_dimension]();
     double prob = this->random_generator.uniform_random(0, 1);
-    if (prob < 0.2){
+    if (prob < 0.05){
         for (unsigned int i = 0; i < state_dimension; i++){
             sample_state[i] = goal_state[i];
         }
@@ -416,7 +420,7 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
 	    this->random_state(sample_state);
         sst_node_t* nearest = nearest_vertex(sample_state);
         //  add neural sampling 
-        neural_sample(system, nearest->get_point(), neural_sample_state, env_vox, refine); 
+        neural_sample(system, nearest->get_point(), neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection); 
         // steer func
         
         double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);

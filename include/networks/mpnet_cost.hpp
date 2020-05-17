@@ -17,7 +17,8 @@ namespace networks{
         // virtual void mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor, 
         //     const double* state,  double* goal_state, double* neural_sample_state) override;
         void mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor, 
-            const double* state,  double* goal_state, double* neural_sample_state, bool refine);
+            const double* state,  double* goal_state, double* neural_sample_state, 
+            bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection);
         int num_sample;
         std::string device_id;
         float refine_lr;
