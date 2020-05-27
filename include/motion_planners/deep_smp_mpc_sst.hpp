@@ -82,6 +82,7 @@ public:
 	 */
 	 virtual void step(system_interface* system, int min_time_steps, int max_time_steps, double integration_step);
 	 virtual void step(enhanced_system_interface* system, int min_time_steps, int max_time_steps, double integration_step);
+	 virtual void mpc_step(enhanced_system_t* system, double integration_step);
 
 
 	/**

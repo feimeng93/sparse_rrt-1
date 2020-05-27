@@ -436,3 +436,26 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
     delete neural_sample_state;
     delete terminal_state;
 }
+
+
+void deep_smp_mpc_sst_t::mpc_step(enhanced_system_t* system, double integration_step)
+{
+    /*
+     * Generate a random sample
+     * Find the closest existing node
+     * Generate random control
+     * Propagate for random time with constant random control from the closest node
+     * If resulting state is valid, add a resulting state into the tree and perform sst-specific graph manipulations
+     */
+    double* terminal_state = new double[this->state_dimension]();
+    double* sample_state = new double[this->state_dimension];
+	this->random_state(sample_state);
+    sst_node_t* nearest = nearest_vertex(sample_state);
+    double duration = steer(system, nearest->get_point(), sample_state, terminal_state, integration_step);
+	if(duration > 0)
+	{
+		add_to_tree(terminal_state, 0, nearest, duration);
+	}
+    delete sample_state;
+    delete terminal_state;
+}

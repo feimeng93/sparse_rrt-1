@@ -6,26 +6,43 @@
 // #define DEBUG
 namespace networks{
     mpnet_cost_t::mpnet_cost_t(std::string network_weights_path, 
-        std::string cost_predictor_weights_path, int num_sample, std::string device_id, float refine_lr) : mpnet_t(network_weights_path),
+        std::string cost_predictor_weights_path,
+        std::string cost_to_go_predictor_weights_path, 
+        int num_sample, std::string device_id, float refine_lr) : mpnet_t(network_weights_path),
         num_sample(num_sample), device_id(device_id), refine_lr(refine_lr)
         {
             if(network_weights_path.length() == 0){
-                network_weights_path = "/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt";
+                network_weights_path = "/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet_10k.pt";
             } 
+            
+            if(cost_predictor_weights_path.length() == 0){
+                cost_predictor_weights_path = "/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cost_10k.pt";
+            }
+
+            if(cost_to_go_predictor_weights_path.length() == 0){
+                cost_to_go_predictor_weights_path = "/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cost_to_go_10k.pt";
+            }
+
             network_torch_module_ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(network_weights_path)));
-            if(cost_predictor_weights_path.length() == 0){
-                cost_predictor_weights_path = "/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/costnet5000.pt";
-            }
+
             cost_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(cost_predictor_weights_path)));
             network_torch_module_ptr->to(torch::Device(device_id));;
             cost_predictor_torch_module_ptr->to(torch::Device(device_id));
+            
+            
+            cost_to_go_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
+                    torch::jit::load(cost_to_go_predictor_weights_path)));
+            cost_to_go_predictor_torch_module_ptr->to(torch::Device(device_id));
+            
+            
     }
 
     mpnet_cost_t::~mpnet_cost_t(){
         network_torch_module_ptr.reset();
         cost_predictor_torch_module_ptr.reset();
+        cost_to_go_predictor_torch_module_ptr.reset();
     }
 
     at::Tensor mpnet_cost_t::forward(std::vector<torch::jit::IValue> input_container){
@@ -34,6 +51,11 @@ namespace networks{
 
     at::Tensor mpnet_cost_t::forward_cost(std::vector<torch::jit::IValue> input_container){
         return cost_predictor_torch_module_ptr -> forward(input_container).toTensor();
+    }
+
+
+    at::Tensor mpnet_cost_t::forward_cost_to_go(std::vector<torch::jit::IValue> input_container){
+        return cost_to_go_predictor_torch_module_ptr -> forward(input_container).toTensor();
     }
 
     
@@ -75,49 +97,48 @@ namespace networks{
         }else{
             predicted_state_var = predicted_state_tensor;
         }
+      
+        // using cost to go
+        cost_input = at::cat({predicted_state_var, goal_tensor_expand}, 1).to(torch::Device(device_id));
+        input_container.at(0) = cost_input;
+        predicted_costs = this -> forward_cost_to_go(input_container).to(torch::Device(device_id));
+        best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
+        
         if(using_one_step_cost){
             cost_input = at::cat({state_tensor_expand, predicted_state_var}, 1).to(torch::Device(device_id));
             input_container.at(0) = cost_input;
-            predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
-            best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
-            
-        } else {// using cost to go
-            // current_cost_to_go = this -> forward_cost(input_container).to(torch::Device(device_id));
-            cost_input = at::cat({predicted_state_var, goal_tensor_expand}, 1).to(torch::Device(device_id));
-            input_container.at(0) = cost_input;
-            predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
-            best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
-        }           
+            predicted_costs += this -> forward_cost(input_container).to(torch::Device(device_id));
+        }
         // refining goes here
         if(refine){
             predicted_costs.sum().backward();
             torch::Tensor refine_grad = predicted_state_var.grad().to(torch::Device(device_id));
-            torch::Tensor refine_norm = at::norm(refine_grad, 2, 1, true);
+            torch::Tensor grad_norm = at::norm(refine_grad, 2, 1, true);
             // std::cout<< refine_norm.sizes()<<std::endl;
             // for(int i = 0; i < num_sample; i++){
             //     std::cout<<"norm:\t"<<refine_norm[i].item<double>() << std::endl;
             // }
-            // refine_grad /= refine_norm;
-            if(using_one_step_cost){
-                // predicted_state_tensor = predicted_state_tensor - refine_lr * refine * ((predicted_costs) > refine_threshold);
-                predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * (refine_norm > refine_threshold);
-            } else{// using cost to go
-                // predicted_state_tensor = predicted_state_tensor - refine_lr * refine * ((current_cost_to_go - predicted_costs) > refine_threshold);
-                predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * (refine_norm > refine_threshold);
-                // predicted_state_tensor = predicted_state_tensor -
-                //     refine_lr * refine_grad * (refine_norm > refine_threshold);
+            
+            refine_grad /= grad_norm;
+            // predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * at::clamp(grad_norm, -refine_threshold, refine_threshold);
+            // predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * at::clamp(grad_norm, -refine_threshold, refine_threshold)* (grad_norm > refine_threshold);
 
-            }
+            predicted_state_tensor = predicted_state_tensor - refine_lr * refine_grad * (grad_norm > refine_threshold);
+
+            // if(using_one_step_cost){
+            //     // predicted_state_tensor = predicted_state_tensor - refine_lr * refine * ((predicted_costs) > refine_threshold);
+            // } else{// using cost to go
+            //     // predicted_state_tensor = predicted_state_tensor - refine_lr * refine * ((current_cost_to_go - predicted_costs) > refine_threshold);
+                
+            //     // predicted_state_tensor = predicted_state_tensor -
+            //     //     refine_lr * refine_grad * (refine_norm > refine_threshold);
+
+            // }
             
         }
        
         if(cost_reselection){
-            if(using_one_step_cost){
-                cost_input = at::cat({state_tensor_expand, predicted_state_tensor}, 1).to(torch::Device(device_id));
-            }
-            else{
-                cost_input = at::cat({predicted_state_tensor, goal_tensor_expand}, 1).to(torch::Device(device_id));
-            }
+            cost_input = at::cat({predicted_state_tensor, goal_tensor_expand}, 1).to(torch::Device(device_id));
             input_container.at(0) = cost_input;
             predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
             best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));

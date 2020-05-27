@@ -45,6 +45,7 @@ int main(){
     networks::mpnet_cost_t mpnet(
         std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"),
         std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/costnet5000.pt"),
+        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cost_to_go_10k.pt"),
         5, "cuda:0", 0.2);
     //  networks::mpnet_t mpnet(
     //     std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"));

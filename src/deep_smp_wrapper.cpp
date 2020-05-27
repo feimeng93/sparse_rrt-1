@@ -38,7 +38,9 @@ public:
             const py::safe_array<double> &obs_list_array,
             double width,
             bool verbose,
-            std::string mpnet_weight_path, std::string costnet_weight_path, int num_sample,
+            std::string mpnet_weight_path, std::string cost_predictor_weight_path,
+            std::string cost_to_go_predictor_weight_path,
+            int num_sample,
             int ns, int nt, int ne, int max_it,
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
             std::string device_id, float refine_lr
@@ -68,7 +70,10 @@ public:
         dt = integration_step;
         
         mpnet.reset(
-            new networks::mpnet_cost_t(mpnet_weight_path, costnet_weight_path, num_sample, device_id, refine_lr)
+            new networks::mpnet_cost_t(mpnet_weight_path, 
+            cost_predictor_weight_path, 
+            cost_to_go_predictor_weight_path,
+            num_sample, device_id, refine_lr)
             //  new networks::mpnet_t(mpnet_weight_path)
         );
         
@@ -100,6 +105,10 @@ public:
 	//  */
     void step(int min_time_steps, int max_time_steps, double integration_step) {
         planner->step(system, min_time_steps, max_time_steps, integration_step);
+    }
+
+    void mpc_step(double integration_step) {
+        planner->mpc_step(system, integration_step);
     }
 
     void neural_step(py::safe_array<double>& obs_voxel_array,
@@ -220,7 +229,9 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             const py::safe_array<double>&,
             double,
             bool,
-            std::string, std::string, int,
+            std::string, std::string, 
+            std::string, 
+            int,
             int, int, int, int,
             double, double, double, double, double, double, double, double,
             std::string, float>(),
@@ -233,7 +244,9 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "obs_list"_a,
             "width"_a,
             "verbose"_a,
-            "mpnet_weight_path"_a, "cost_predictor_weight_path"_a, "num_sample"_a,
+            "mpnet_weight_path"_a, "cost_predictor_weight_path"_a,
+            "cost_to_go_predictor_weight_path"_a,
+            "num_sample"_a,
             "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
             "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a,
             "device_id"_a, "refine_lr"_a=0.2
@@ -241,6 +254,9 @@ PYBIND11_MODULE(_deep_smp_module, m) {
         .def("step", &DSSTMPCWrapper::step,
             "min_time_steps"_a,
             "max_time_steps"_a,
+            "integration_step"_a
+        )
+        .def("mpc_step", &DSSTMPCWrapper::mpc_step,
             "integration_step"_a
         )
         .def("nearest_vertex", &DSSTMPCWrapper::nearest_vertex,
