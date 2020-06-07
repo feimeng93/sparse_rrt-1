@@ -1,7 +1,7 @@
 #include "trajectory_optimizers/cem.hpp"
 #include "trajectory_optimizers/cem_config.hpp"
 
-#include "systems/two_link_acrobot_obs_t.hpp"
+#include "systems/two_link_acrobot_obs.hpp"
 #include "systems/distance_functions.h"
 
 #include "motion_planners/deep_smp_mpc_sst.hpp"

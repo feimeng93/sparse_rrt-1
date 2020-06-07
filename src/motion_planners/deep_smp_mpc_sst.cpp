@@ -204,6 +204,7 @@ void deep_smp_mpc_sst_t::add_to_tree(const double* sample_state, const double* s
             ));
 			number_of_nodes++;
 
+            // std::cout <<"goal_distance:" << distance(new_node->get_point(), goal_state, this->state_dimension) << std::endl;
 	        if(best_goal==NULL && this->distance(new_node->get_point(), goal_state, this->state_dimension)<goal_radius)
 	        {
 	        	best_goal = new_node;

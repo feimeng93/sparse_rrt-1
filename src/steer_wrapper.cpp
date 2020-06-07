@@ -4,7 +4,9 @@
 #include <pybind11/functional.h>
 
 #include "systems/enhanced_system.hpp"
-#include "systems/two_link_acrobot_obs_t.hpp"
+#include "systems/two_link_acrobot_obs.hpp"
+#include "systems/cart_pole_obs.hpp"
+
 #include "trajectory_optimizers/cem.hpp"
 
 namespace pybind11 {
@@ -95,7 +97,7 @@ class __attribute__ ((visibility ("hidden"))) RectangleObsWrapper : public enhan
     RectangleObsWrapper(
         const py::safe_array<double> &_obs_list,
         double width,
-        const std::string &env_name){
+        const std::string &system_name){
             if (_obs_list.shape()[0] == 0) {
                 throw std::runtime_error("Should contain at least one obstacles.");
             }
@@ -113,8 +115,12 @@ class __attribute__ ((visibility ("hidden"))) RectangleObsWrapper : public enhan
                 obs_list[i][0] = py_obs_list(i, 0);
                 obs_list[i][1] = py_obs_list(i, 1);
             }
-            if (env_name == "acrobot"){
+            if (system_name == "acrobot_obs"){
                 system_obs.reset(new two_link_acrobot_obs_t(obs_list, width));
+                state_dimension = 4;
+                control_dimension = 1;
+            } else if(system_name == "cartpole_obs"){
+                system_obs.reset(new cart_pole_obs_t(obs_list, width));
                 state_dimension = 4;
                 control_dimension = 1;
             }
@@ -127,6 +133,19 @@ class __attribute__ ((visibility ("hidden"))) RectangleObsWrapper : public enhan
             return system_obs->propagate(start_state, state_dimension, control, control_dimension,
                 num_steps, result_state, integration_step);
     }
+    // py::safe_array<double> propagate(
+    //     const py::safe_array<double>& start_state,
+    //     const py::safe_array<double>& control,
+    //     int num_steps, double integration_step){
+    //         auto start_state_array =  start_state.unchecked<1>();
+    //         auto control_array =  control.unchecked<1>();
+    //         double* result_state = new double[start_state.size()]();
+    //         system_obs->propagate(start_state_array, start_state.size(), control_array, control.size(),
+    //             num_steps, result_state, integration_step);
+    //         py::safe_array<double> start_state_array{{start_state.size()}};
+    //         std::copy(result_state, result_state + start_state.size(), start_state_array.mutable_data(0));
+    //         return ;
+    // }
 
     void enforce_bounds(){/*system_obs->enforce_bounds();*/}
 
@@ -166,6 +185,57 @@ class __attribute__ ((visibility ("hidden"))) RectangleObsWrapper : public enhan
  };
 
 
+// class __attribute__ ((visibility ("hidden"))) CEMMPCWrapper : public RectangleObsWrapper
+// {
+//  public:
+//     /**
+//      * @brief Python wrapper of RectangleObsWrapper constructor
+//      * @details Python wrapper of RectangleObsWrapper constructor
+//      *
+//      * @param _obs_list: numpy array (N x 2) representing the middle point of the obstacles
+//      * @param width: width of the rectangle obstacle
+//      */
+//     CEMMPCWrapper(
+//         const py::safe_array<double> &_obs_list,
+//         double width,
+//         const std::string &system_name){
+//             if (_obs_list.shape()[0] == 0) {
+//                 throw std::runtime_error("Should contain at least one obstacles.");
+//             }
+//             if (_obs_list.shape()[1] != 2) {
+//                 throw std::runtime_error("Shape of the obstacle input should be (N,2).");
+//             }
+//             if (width <= 0.) {
+//                 throw std::runtime_error("obstacle width should be non-negative.");
+//             }
+//             auto py_obs_list = _obs_list.unchecked<2>();
+//             // initialize the array
+//             std::vector<std::vector<double>> obs_list(_obs_list.shape()[0], std::vector<double>(2, 0.0));
+//             // copy from python array to this array
+//             for (unsigned int i = 0; i < obs_list.size(); i++) {
+//                 obs_list[i][0] = py_obs_list(i, 0);
+//                 obs_list[i][1] = py_obs_list(i, 1);
+//             }
+//             if (system_name == "acrobot_obs"){
+//                 system_obs.reset(new two_link_acrobot_obs_t(obs_list, width));
+//                 state_dimension = 4;
+//                 control_dimension = 1;
+//             } else if(system_name == "cartpole_obs"){
+//                 system_obs.reset(new cart_pole_obs_t(obs_list, width));
+//                 state_dimension = 4;
+//                 control_dimension = 1;
+//             }
+//     }
+
+//     py::safe_array<double> solve(py::safe_array<double> strat, py::safe_array<double> goal){}
+//  protected:
+//  	/**
+//  	 * @brief Created planner object
+//  	 */
+//      std::unique_ptr<enhanced_system_t> system_obs;
+//  };
+
+
 PYBIND11_MODULE(_steer_module, m) {
     m.doc() = "Python wrapper for deep smp planners";
 
@@ -188,7 +258,7 @@ PYBIND11_MODULE(_steer_module, m) {
             const std::string &>(),
         "obstacle_list"_a,
         "obstacle_width"_a,
-        "env_name"_a
+        "system_name"_a
     );
 
     // py::class_<two_link_acrobot_obs_t>(m, "TwoLinkAcrobotObs", enhanced_system).def(py::init<>());

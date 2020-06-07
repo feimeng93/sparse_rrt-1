@@ -18,14 +18,14 @@
 #include <vector>
 
 #include "systems/distance_functions.h"
-
+#include "systems/system.hpp"
 
 /**
  * A minimal interface for a controllable system.
  * TODO: This currently includes visualization abilities, but it should be moved out
  *
  */
-struct enhanced_system_interface {
+struct enhanced_system_interface : system_interface {
     /**
 	 * @brief Performs a local propagation using simple numerical integration.
 	 * @details Performs a local propagation using simple numerical integration.

@@ -17,7 +17,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(INCLUDE_DIRECTORIES include)
 
-add_definitions(-O3 )
+add_definitions(-O3)
 #SET(CMAKE_BUILD_TYPE "Debug")
 #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 #SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
@@ -103,7 +103,8 @@ set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
 
 # for mpc and cem
 set(MPC_SOURCE
-    src/systems/two_link_acrobot_obs_t.cpp
+    src/systems/cart_pole_obs.cpp
+    src/systems/two_link_acrobot_obs.cpp
     src/trajectory_optimizers/cem.cpp)
 
 add_library(CEMMPC SHARED
@@ -112,7 +113,8 @@ add_library(CEMMPC SHARED
 
 ### for steer module
 add_library(steer_module SHARED
-    src/systems/two_link_acrobot_obs_t.cpp
+    src/systems/cart_pole_obs.cpp
+    src/systems/two_link_acrobot_obs.cpp
     ${PROJECT_SOURCE_DIR}/src/steer_wrapper.cpp
     )
 target_link_libraries(steer_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)

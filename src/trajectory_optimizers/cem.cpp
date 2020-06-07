@@ -103,7 +103,7 @@ namespace trajectory_optimizers{
                                 }
                         }
                         else{ // collision
-                            loss.at(si).first += 1e3;
+                            loss.at(si).first += 1000;
                             active_mask[si] = false;
                         }
                     }
@@ -149,7 +149,7 @@ namespace trajectory_optimizers{
 
             } else{
                 early_stop_count += 1;
-                if(early_stop_count >= it_max){
+                if(early_stop_count >= it_max || min_loss >= 100){
                     break;
                 }
             }

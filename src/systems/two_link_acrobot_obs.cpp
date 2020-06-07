@@ -13,7 +13,7 @@
  */
 
 
-#include "systems/two_link_acrobot_obs_t.hpp"
+#include "systems/two_link_acrobot_obs.hpp"
 
 
 #define _USE_MATH_DEFINES

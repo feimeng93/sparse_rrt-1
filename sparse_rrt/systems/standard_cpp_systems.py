@@ -37,8 +37,14 @@ class TwoLinkAcrobot(_sst_module.TwoLinkAcrobot):
     def distance_computer(self):
         return _sst_module.TwoLinkAcrobotDistance()
 
+class CartPoleObs(_steer_module.RectangleObsSystem):
+    def __init__(self, obs_list, width):
+        super(CartPoleObs, self).__init__(obs_list, width, "cartpole_obs")
+    def distance_computer(self):
+        return _sst_module.euclidean_distance(np.array(self.is_circular_topology()))
+
 class TwoLinkAcrobotObs(_steer_module.RectangleObsSystem):
     def __init__(self, obs_list, width):
-        super(TwoLinkAcrobotObs, self).__init__(obs_list, width, "acrobot")
+        super(TwoLinkAcrobotObs, self).__init__(obs_list, width, "acrobot_obs")
     def distance_computer(self):
         return _sst_module.TwoLinkAcrobotDistance()

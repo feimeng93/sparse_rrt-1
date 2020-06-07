@@ -3,7 +3,9 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 
-#include "systems/two_link_acrobot_obs_t.hpp"
+#include "systems/cart_pole_obs.hpp"
+#include "systems/two_link_acrobot_obs.hpp"
+
 #include "trajectory_optimizers/cem.hpp"
 
 #include "networks/mpnet.hpp"
@@ -29,6 +31,7 @@ public:
 	 *
 	 */
     DSSTMPCWrapper(
+            std::string system_string,
             const py::safe_array<double> &start_state_array,
             const py::safe_array<double> &goal_state_array,
             double goal_radius,
@@ -45,6 +48,10 @@ public:
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
             std::string device_id, float refine_lr
     ){
+        if(system_string.size()==0){
+            system_string="cartpole_obs";
+        }
+        system_type = system_string;
         auto start_state = start_state_array.unchecked<1>();
         auto goal_state = goal_state_array.unchecked<1>();
 
@@ -63,9 +70,29 @@ public:
         for (unsigned int i = 0; i < obs_list.size(); i++) {
              obs_list[i][0] = py_obs_list(i, 0);
              obs_list[i][1] = py_obs_list(i, 1);
-         }
+        }
 
-        system = new two_link_acrobot_obs_t(obs_list, width);
+
+        if (system_type == "acrobot_obs"){
+            system = new two_link_acrobot_obs_t(obs_list, width);
+            distance_computer = two_link_acrobot_obs_t::distance;
+            loss_weights[0] = 1;
+            loss_weights[1] = 1;
+            loss_weights[2] = 0.2;
+            loss_weights[3] = 0.2;
+
+        } else if (system_type == "cartpole_obs"){
+            system = new cart_pole_obs_t(obs_list, width);
+            distance_computer = cart_pole_obs_t::distance;
+            loss_weights[0] = 1;
+            loss_weights[1] = 0.2;
+            loss_weights[2] = 1;
+            loss_weights[3] = 0.2;
+        } else{
+            std::cout<<"undefined system"<<std::endl;
+            exit(-1);
+        }
+
 
         dt = integration_step;
         
@@ -91,7 +118,7 @@ public:
                     &start_state(0), &goal_state(0), goal_radius,
                     system->get_state_bounds(),
                     system->get_control_bounds(),
-                    two_link_acrobot_obs_t::distance,
+                    distance_computer,
                     random_seed,
                     sst_delta_near, sst_delta_drain, 
                     cem.get(),
@@ -124,8 +151,6 @@ public:
         torch::Tensor obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
         planner -> neural_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection);
   
-      
-
     }
 
     /**
@@ -195,8 +220,10 @@ public:
         return this->planner->get_number_of_nodes();
     }
 
+    std::string system_type;
 protected:
     enhanced_system_t *system;
+    std::function<double(const double*, const double*, unsigned int)> distance_computer;
     std::unique_ptr<trajectory_optimizers::CEM> cem;
     std::unique_ptr<networks::mpnet_cost_t> mpnet;
     // std::unique_ptr<networks::mpnet_cost_t> mpnet;
@@ -205,8 +232,7 @@ protected:
     sst_node_t* nearest;
     std::vector<std::vector<double>> obs_list;
     double dt;
-    double loss_weights[4] = {1, 1, 0.2, 0.2};
-
+    double* loss_weights = new double[4]();
 
 private:
 
@@ -220,6 +246,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
     m.doc() = "Python wrapper for deep smp planners";
     py::class_<DSSTMPCWrapper>(m, "DSSTMPCWrapper")
         .def(py::init<
+            std::string,
             const py::safe_array<double>&,
             const py::safe_array<double>&,
             double,
@@ -235,6 +262,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             int, int, int, int,
             double, double, double, double, double, double, double, double,
             std::string, float>(),
+            "system_type"_a,
             "start_state"_a,
             "goal_state"_a,
             "goal_radius"_a,

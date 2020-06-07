@@ -389,12 +389,12 @@ public:
             };
 
         planner.reset(
-                new sst_backend_t(
-                        &start_state(0), &goal_state(0), goal_radius,
-                        state_bounds_v, control_bounds_v,
-                        distance_f,
-                        random_seed,
-                        sst_delta_near, sst_delta_drain)
+            new sst_backend_t(
+                    &start_state(0), &goal_state(0), goal_radius,
+                    state_bounds_v, control_bounds_v,
+                    distance_f,
+                    random_seed,
+                    sst_delta_near, sst_delta_drain)
         );
     }
 
@@ -420,7 +420,6 @@ public:
         auto sample_state = sample_state_array.unchecked<1>();
         const double* sample_control = new double[planner -> get_control_dimension()];
         planner -> add_to_tree(&sample_state(0), sample_control, nearest, duration);       
-
     }
 
 protected:
@@ -428,7 +427,6 @@ protected:
     sst_node_t* nearest;
 
 private:
-
 	/**
 	 * @brief Captured distance computer python object to prevent its premature death
 	 */
