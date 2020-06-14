@@ -232,7 +232,8 @@ double cart_pole_obs_t::get_loss(double* state, const double* goal, double* weig
     double val = fabs(state[STATE_THETA]-goal[STATE_THETA]);
     if(val > M_PI)
             val = 2*M_PI-val;
-    return std::sqrt( val * val * weight[2] + pow(state[0]-goal[0], 2.0) * weight[0]+ pow(state[1]-goal[1], 2.0)* weight[1]+ pow(state[3]-goal[3], 2.0)* weight[3] );
+    return std::sqrt(val * val * weight[2] + pow(state[STATE_X]-goal[STATE_X], 2.0) * weight[STATE_X]+ pow(state[STATE_V]-goal[STATE_V], 2.0)* weight[STATE_V] 
+        + pow(state[STATE_W]-goal[STATE_W], 2.0)* weight[STATE_W]);
 }
 
 double cart_pole_obs_t::angular_error(double angle, double goal){

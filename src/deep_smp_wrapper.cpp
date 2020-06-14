@@ -46,7 +46,7 @@ public:
             int num_sample,
             int ns, int nt, int ne, int max_it,
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
-            std::string device_id, float refine_lr
+            std::string device_id, float refine_lr, bool normalize
     ){
         if(system_string.size()==0){
             system_string="cartpole_obs";
@@ -100,7 +100,7 @@ public:
             new networks::mpnet_cost_t(mpnet_weight_path, 
             cost_predictor_weight_path, 
             cost_to_go_predictor_weight_path,
-            num_sample, device_id, refine_lr)
+            num_sample, device_id, refine_lr, normalize)
             //  new networks::mpnet_t(mpnet_weight_path)
         );
         
@@ -261,7 +261,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             int,
             int, int, int, int,
             double, double, double, double, double, double, double, double,
-            std::string, float>(),
+            std::string, float, bool>(),
             "system_type"_a,
             "start_state"_a,
             "goal_state"_a,
@@ -277,7 +277,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "num_sample"_a,
             "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
             "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a,
-            "device_id"_a, "refine_lr"_a=0.2
+            "device_id"_a, "refine_lr"_a=0.2, "normalize"_a=true
         )
         .def("step", &DSSTMPCWrapper::step,
             "min_time_steps"_a,

@@ -13,7 +13,8 @@ namespace networks{
             std::string cost_to_go_predictor_weights_path,
             int num_sample, 
             std::string device_id,
-            float refine_lr);
+            float refine_lr,
+            bool normalize);
         at::Tensor forward(std::vector<torch::jit::IValue> input_container);
         at::Tensor forward_cost(std::vector<torch::jit::IValue> input_container);
         at::Tensor forward_cost_to_go(std::vector<torch::jit::IValue> input_container);
@@ -26,6 +27,7 @@ namespace networks{
         int num_sample;
         std::string device_id;
         float refine_lr;
+        bool normalize;
         ~mpnet_cost_t();
     protected:
         std::shared_ptr<torch::jit::script::Module> network_torch_module_ptr;

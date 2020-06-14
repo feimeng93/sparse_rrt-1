@@ -27,8 +27,20 @@ public:
 	double distance(double* point1, double* point2);
 	virtual bool valid_state();
 
+	std::vector<std::pair<double, double>> get_state_bounds() const override;
+    std::vector<std::pair<double, double>> get_control_bounds() const override;
+
+    std::vector<bool> is_circular_topology() const override;
+
+	void normalize(const double* state, double* normalized);
+	void denormalize(double* normalized,  double* state);
+
+	std::tuple<double, double> visualize_point(const double* state, unsigned int state_dimension) const;
+
+	
 	protected:
 		double* deriv;
-		void update_derivative(double* control);
+		// bool validiy;
+		void update_derivative(const double* control);
 		// ompl::base::StateValidityCheckerPtr svc;
 };

@@ -1,15 +1,8 @@
-#include "trajectory_optimizers/cem.hpp"
-#include "trajectory_optimizers/cem_config.hpp"
-
 #include "systems/two_link_acrobot_obs.hpp"
 #include "systems/distance_functions.h"
 
-#include "motion_planners/deep_smp_mpc_sst.hpp"
+#include "motion_planners/sst.hpp"
 
-#include "networks/mpnet.hpp"
-#include "networks/mpnet_cost.hpp"
-
-#include <torch/script.h>
 #include <iostream>
 #include <string>
 
@@ -46,7 +39,7 @@ int main(){
         std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"),
         std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/costnet5000.pt"),
         std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cost_to_go_10k.pt"),
-        5, "cuda:0", 0.2, true);
+        5, "cuda:0", 0.2);
     //  networks::mpnet_t mpnet(
     //     std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"));
     deep_smp_mpc_sst_t* planner;

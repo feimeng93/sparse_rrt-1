@@ -62,20 +62,28 @@ namespace networks{
     void mpnet_cost_t::mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor,
         const double* state, double* goal_state, double* neural_sample_state, bool refine, float refine_threshold,
         bool using_one_step_cost, bool cost_reselection){
-        double* normalized_state = new double[system->get_state_dimension()];
-        double* normalized_goal = new double[system->get_state_dimension()];
-        double* normalized_neural_sample_state = new double[system->get_state_dimension()];
-        system -> normalize(state, normalized_state);
-        system -> normalize(goal_state, normalized_goal);
+        double* input_state = new double[system->get_state_dimension()];
+        double* input_goal = new double[system->get_state_dimension()];
+        double* output_neural_sample_state = new double[system->get_state_dimension()];
+        if (normalize){
+            system -> normalize(state, input_state);
+            system -> normalize(goal_state, input_goal);
+        } else{
+            for(int i = 0; i < system->get_state_dimension(); i++){
+                input_state[i] = state[i];
+                input_goal[i] = goal_state[i];
+            }
+
+        }
         std::vector<torch::jit::IValue> input_container;
         torch::Tensor state_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
         torch::Tensor goal_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
         // set value state_goal with dim 1 x 8
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-            state_tensor[0][si] = normalized_state[si];    
+            state_tensor[0][si] = input_state[si];    
         }
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-            goal_tensor[0][si] = normalized_goal[si]; 
+            goal_tensor[0][si] = input_goal[si]; 
         }
         
         at::Tensor state_tensor_expand = state_tensor.repeat({num_sample, 1}).to(torch::Device(device_id));
@@ -146,11 +154,18 @@ namespace networks{
         unsigned int best_index = best_index_tensor.item<int>();
         
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
-            normalized_neural_sample_state[si] = predicted_state_tensor[best_index][si].item<double>();
+            output_neural_sample_state[si] = predicted_state_tensor[best_index][si].item<double>();
         }
-        delete normalized_state;
-        delete normalized_goal;
-        delete normalized_neural_sample_state;
+        if(normalize){
+            system -> denormalize(output_neural_sample_state, neural_sample_state);
+        } else{
+            for(int i = 0; i < system->get_state_dimension(); i++){
+                neural_sample_state[i] = output_neural_sample_state[i];
+            }
+        }
+        delete input_state;
+        delete input_goal;
+        delete output_neural_sample_state;
     }
 
     
