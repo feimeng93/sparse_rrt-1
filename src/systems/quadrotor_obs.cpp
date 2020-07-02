@@ -1,5 +1,8 @@
-#include "systems/quadrotor.hpp"
+#include "systems/quadrotor_obs.hpp"
 #include <iostream>
+
+#define _USE_MATH_DEFINES
+#include <cmath>
 
 #define MIN_X -5
 #define MAX_X 5
@@ -12,6 +15,8 @@
 #define MASS_INV 1.
 #define BETA 1.
 #define EPS 2.107342e-08
+static const double MAX_QUATERNION_NORM_ERROR = 1e-9;
+
 #define g 9.81
 
 #define MIN_C1 -15
@@ -19,7 +24,7 @@
 #define MIN_C -1
 #define MAX_C 1.
 
-void quadrotor_t::enforce_bounds_SO3(double* qstate){
+void quadrotor_obs_t::enforce_bounds_SO3(double* qstate){
     double nrmsq = qstate[0]*qstate[0] + qstate[1]*qstate[1] + qstate[2]*qstate[2] + qstate[3]*qstate[3];
     double error = std::abs(1.0 - nrmsq);
     if (error < EPS) {
@@ -43,7 +48,7 @@ void quadrotor_t::enforce_bounds_SO3(double* qstate){
 }
 
 
-bool quadrotor_t::propagate(
+bool quadrotor_obs_t::propagate(
 		const double* start_state, unsigned int state_dimension,
         const double* control, unsigned int control_dimension,
 	    int num_steps, double* result_state, double integration_step){
@@ -66,11 +71,11 @@ bool quadrotor_t::propagate(
     return true;//validity;
 }
 
-bool quadrotor_t::valid_state(){
+bool quadrotor_obs_t::valid_state(){
     return true;
 }
 
-void quadrotor_t::enforce_bounds(){
+void quadrotor_obs_t::enforce_bounds(){
     // for v and w
     for(int i_s = 7; i_s < state_dimension; i_s++)
     if(temp_state[i_s] < MIN_V){
@@ -79,19 +84,19 @@ void quadrotor_t::enforce_bounds(){
     }else if(temp_state[i_s] > MAX_V){
         temp_state[i_s] = MAX_V;
     }
-    enforce_bounds_SO3(temp_state+3);
+    enforce_bounds_SO3(&temp_state[3]);
 
 };
 
-double quadrotor_t::distance(double* point1, double* point2){
-    double dis = 0;
-    for(int i_s = 0; i_s < state_dimension; i_s++){
-        dis += (point1[i_s] - point2[i_s]) * (point1[i_s] - point2[i_s]);
-    }
-    return dis;
-};		
+// double quadrotor_obs_t::distance(double* point1, double* point2){
+//     double dis = 0;
+//     for(int i_s = 0; i_s < state_dimension; i_s++){
+//         dis += (point1[i_s] - point2[i_s]) * (point1[i_s] - point2[i_s]);
+//     }
+//     return dis;
+// };		
 
-void quadrotor_t::update_derivative(const double* control){
+void quadrotor_obs_t::update_derivative(const double* control){
     double* u = new double[control_dimension];
     // enforce control
     if(control[0] > MAX_C1){
@@ -121,21 +126,23 @@ void quadrotor_t::update_derivative(const double* control){
     qomega[3] = 0;
     enforce_bounds_SO3(qomega);
     double delta = temp_state[3] * qomega[0] + temp_state[4] * qomega[1] + temp_state[5] * qomega[2];
+    // d theta / dt = omega
     deriv[3] = qomega[0] - delta * temp_state[3];
     deriv[4] = qomega[1] - delta * temp_state[4];
     deriv[5] = qomega[2] - delta * temp_state[5];
     deriv[6] = qomega[3] - delta * temp_state[6];
+    // d v / dt = a 
     deriv[7] = MASS_INV * (-2*u[0]*(temp_state[6]*temp_state[4] + temp_state[3]*temp_state[5]) - BETA * temp_state[7]);
     deriv[8] = MASS_INV * (-2*u[0]*(temp_state[4]*temp_state[5] - temp_state[6]*temp_state[3]) - BETA * temp_state[8]);
     deriv[9] = MASS_INV * (-u[0]*(temp_state[6]*temp_state[6]-temp_state[3]*temp_state[3]-temp_state[4]*temp_state[4]+temp_state[5]*temp_state[5]) - BETA * temp_state[9]) - 9.81;
-
+    // d omega / dt = alpha
     deriv[10] = u[1];
     deriv[11] = u[2];
     deriv[12] = u[3];
 
 };
 
-std::vector<std::pair<double, double> > quadrotor_t::get_control_bounds() const{
+std::vector<std::pair<double, double> > quadrotor_obs_t::get_control_bounds() const{
     return {
             {MIN_C1, MAX_C1},
             {MIN_C, MAX_C},
@@ -144,7 +151,7 @@ std::vector<std::pair<double, double> > quadrotor_t::get_control_bounds() const{
     };
 }
 
-std::vector<std::pair<double, double> > quadrotor_t::get_state_bounds() const {
+std::vector<std::pair<double, double> > quadrotor_obs_t::get_state_bounds() const {
     return {
             {MIN_X, MAX_X},
             {MIN_X, MAX_X},
@@ -165,7 +172,7 @@ std::vector<std::pair<double, double> > quadrotor_t::get_state_bounds() const {
     };
 }
 
-std::vector<bool> quadrotor_t::is_circular_topology() const{
+std::vector<bool> quadrotor_obs_t::is_circular_topology() const{
     return {
             false,
             false,
@@ -186,18 +193,65 @@ std::vector<bool> quadrotor_t::is_circular_topology() const{
     };
 }
 
-void quadrotor_t::normalize(const double* state, double* normalized){
+void quadrotor_obs_t::normalize(const double* state, double* normalized){
     for(int i = 0; i < state_dimension; i++){
         normalized[i] = state[i];
     }
 
 }
-void quadrotor_t::denormalize(double* normalized,  double* state){
+void quadrotor_obs_t::denormalize(double* normalized,  double* state){
     for(int i = 0; i < state_dimension; i++){
         state[i] = normalized[i]; 
     }
 }
 
-std::tuple<double, double> quadrotor_t::visualize_point(const double* state, unsigned int state_dimension) const{
+std::tuple<double, double> quadrotor_obs_t::visualize_point(const double* state, unsigned int state_dimension) const{
     return std::make_tuple(0, 0);
+}
+
+
+double quadrotor_obs_t::distance(const double* point1, const double* point2, unsigned int){
+    double dist = 0.;
+    for(int i = 0; i < 3; i++){
+        dist += (point1[i] - point2[i]) * (point1[i] - point2[i]);
+    }
+
+    dist = sqrt(dist);
+    // for(int i = 7; i < state_dimension; i++){
+    //     dist += (point1[i] - point2[i]) * (point1[i] - point2[i]);
+    // }
+
+    double dq  = 0.;
+    for(int i = 3; i < 7; i++){
+        dq  += fabs(point1[i] * point2[i]) ;
+    }
+    if (dq > 1.0 - MAX_QUATERNION_NORM_ERROR)
+        return 0.0;
+    dq = acos(dq);
+    
+    return dist + dq;
+}
+
+double quadrotor_obs_t::get_loss(double* point1, const double* point2, double* weight){
+    double dist = 0.;
+    for(int i = 0; i < 3; i++){
+        dist += (point1[i] - point2[i]) * (point1[i] - point2[i]) * weight[i] * weight[i];
+    }
+    dist = sqrt(dist);
+
+    double dq  = 0.;
+    for(int i = 3; i < 7; i++){
+        dq  += fabs(point1[i] * point2[i]) * weight[i];
+    }
+    if (dq > 1.0 - MAX_QUATERNION_NORM_ERROR)
+        return 0.0;
+    dq = acos(dq);
+
+    double ds = 0;
+    for(int i = 7; i < 13; i++){
+        ds += (point1[i] - point2[i]) * (point1[i] - point2[i]) * weight[i] * weight[i];
+    }
+    ds = sqrt(ds);
+
+    return dist + dq + ds;
 }

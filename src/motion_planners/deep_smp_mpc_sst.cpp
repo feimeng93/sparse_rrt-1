@@ -25,6 +25,8 @@
 // #define DEBUG
 // #define DEBUG_MPNET
 // #define DEBUG_CEM
+// #define PRINT_GOAL
+
 deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     const double* in_start, const double* in_goal,
     double in_radius,
@@ -204,8 +206,10 @@ void deep_smp_mpc_sst_t::add_to_tree(const double* sample_state, const double* s
             ));
 			number_of_nodes++;
 
-            // std::cout <<"goal_distance:" << distance(new_node->get_point(), goal_state, this->state_dimension) << std::endl;
-	        if(best_goal==NULL && this->distance(new_node->get_point(), goal_state, this->state_dimension)<goal_radius)
+            #ifdef PRINT_GOAL
+            std::cout <<"goal_distance:" << distance(new_node->get_point(), goal_state, this->state_dimension) << std::endl;
+	        #endif
+            if(best_goal==NULL && this->distance(new_node->get_point(), goal_state, this->state_dimension)<goal_radius)
 	        {
 	        	best_goal = new_node;
 	        	branch_and_bound((sst_node_t*)root);
@@ -311,6 +315,30 @@ bool deep_smp_mpc_sst_t::is_best_goal(tree_node_t* v)
 
 }
 
+
+void deep_smp_mpc_sst_t::mpc_step(enhanced_system_t* system, double integration_step)
+{
+    /*
+     * Generate a random sample
+     * Find the closest existing node
+     * Generate random control
+     * Propagate for random time with constant random control from the closest node
+     * If resulting state is valid, add a resulting state into the tree and perform sst-specific graph manipulations
+     */
+    double* terminal_state = new double[this->state_dimension]();
+    double* sample_state = new double[this->state_dimension];
+	this->random_state(sample_state);
+    sst_node_t* nearest = nearest_vertex(sample_state);
+    double duration = steer(system, nearest->get_point(), sample_state, terminal_state, integration_step);
+	if(duration > 0)
+	{
+		add_to_tree(terminal_state, 0, nearest, duration);
+	}
+    delete sample_state;
+    delete terminal_state;
+}
+
+
 void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* nearest,
     double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine, float refine_threshold, 
     bool using_one_step_cost, bool cost_reselection){
@@ -320,7 +348,6 @@ void deep_smp_mpc_sst_t::neural_sample(enhanced_system_t* system, const double* 
 
 double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start, const double* sample, 
     double* terminal_state, double integration_step){
-    // TODO: add steer function with mpc
     #ifdef DEBUG_CEM 
     std::cout<<"start state:\t";
     for(unsigned int si = 0; si < this->state_dimension; si++){// save best state
@@ -372,6 +399,7 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
                 }        
         }
         else{
+            // duration = -1000;
             break;
         } 
     }
@@ -397,9 +425,8 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
 
 
 void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor env_vox, 
-    bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection)
+    bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias)
 {
-    //TODO: implement neural step
     /*
      * Generate a random sample
      * Find the closest existing node
@@ -412,25 +439,32 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
     double* neural_sample_state = new double[this->state_dimension]();
     double* terminal_state = new double[this->state_dimension]();
     double prob = this->random_generator.uniform_random(0, 1);
-    if (prob < 0.05){
+    if (prob < goal_bias){
         for (unsigned int i = 0; i < state_dimension; i++){
             sample_state[i] = goal_state[i];
         }
     }
     else{
 	    this->random_state(sample_state);
-        sst_node_t* nearest = nearest_vertex(sample_state);
-        //  add neural sampling 
-        neural_sample(system, nearest->get_point(), neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection); 
-        // steer func
-        
+    }
+    sst_node_t* nearest = nearest_vertex(sample_state);
+    //  add neural sampling 
+    neural_sample(system, nearest->get_point(), neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection); 
+    // steer func
+    for(unsigned int i = 0; i < state_dimension; i++){
+        system->temp_state[i] = neural_sample_state[i];
+    }
+    if (system -> valid_state()){
         double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);
         // std::cout<<"duration:" << duration << std::endl;    
-
         if(duration > 0)
         {
             add_to_tree(terminal_state, 0, nearest, duration);
         }
+    }
+    for(unsigned int i = 0; i < state_dimension; i++){
+        states[i] = nearest->get_point()[i];
+        states[i + state_dimension] = terminal_state[i];
     }
     
     delete sample_state;
@@ -438,25 +472,3 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
     delete terminal_state;
 }
 
-
-void deep_smp_mpc_sst_t::mpc_step(enhanced_system_t* system, double integration_step)
-{
-    /*
-     * Generate a random sample
-     * Find the closest existing node
-     * Generate random control
-     * Propagate for random time with constant random control from the closest node
-     * If resulting state is valid, add a resulting state into the tree and perform sst-specific graph manipulations
-     */
-    double* terminal_state = new double[this->state_dimension]();
-    double* sample_state = new double[this->state_dimension];
-	this->random_state(sample_state);
-    sst_node_t* nearest = nearest_vertex(sample_state);
-    double duration = steer(system, nearest->get_point(), sample_state, terminal_state, integration_step);
-	if(duration > 0)
-	{
-		add_to_tree(terminal_state, 0, nearest, duration);
-	}
-    delete sample_state;
-    delete terminal_state;
-}

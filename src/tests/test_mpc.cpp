@@ -117,6 +117,7 @@ void test_cartpole(){
 
     // double start[4] =  {-11.40025604,  -0.75909739,   2.24511758,  -1.2173847};
     // double goal[4] = {-11.39767163,   0.8476704 ,   2.14155191,  -1.14537533}; 
+    
     double* u = new double[nt];
     double* t = new double[nt];
     cem.solve(start, goal, u, t);

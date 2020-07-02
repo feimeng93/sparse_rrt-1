@@ -89,7 +89,8 @@ public:
 	 * @copydoc planner_t::step()
 	 */
 	 virtual void neural_step(enhanced_system_t* system, double integration_step, 
-	 	torch::Tensor env_vox_tensor, bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection);
+	 	torch::Tensor env_vox_tensor, bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection,
+		double* states, double goal_bias);
 	
 	// Expose two functions public to enable the python wrappers to call 
 	/**
@@ -119,7 +120,8 @@ public:
 	virtual void neural_sample(enhanced_system_t* system, const double* nearest, 
 		double* neural_sample_state, torch::Tensor env_vox_tensor, bool refine, float refine_threshold,
 		bool using_one_step_cost, bool cost_reselection);
-	
+
+	// double goal_bias;
 protected:
     /**
      * @brief The nearest neighbor data structure.

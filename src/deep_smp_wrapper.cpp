@@ -5,6 +5,7 @@
 
 #include "systems/cart_pole_obs.hpp"
 #include "systems/two_link_acrobot_obs.hpp"
+#include "systems/quadrotor_obs.hpp"
 
 #include "trajectory_optimizers/cem.hpp"
 
@@ -46,7 +47,9 @@ public:
             int num_sample,
             int ns, int nt, int ne, int max_it,
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
-            std::string device_id, float refine_lr, bool normalize
+            std::string device_id, float refine_lr, bool normalize,
+            py::safe_array<double>& weights_array,
+            py::safe_array<double>& obs_voxel_array
     ){
         if(system_string.size()==0){
             system_string="cartpole_obs";
@@ -73,27 +76,31 @@ public:
         }
 
 
+        auto obs_voxel_data = obs_voxel_array.unchecked<1>();
+        std::vector<float> obs_vec;
+        for (unsigned i=0; i < obs_voxel_data.shape(0); i++)
+        {
+            obs_vec.push_back(float(obs_voxel_data(i)));
+        }
+        obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
+
+        auto py_weight_array = weights_array.unchecked<1>();
+        for (unsigned int i = 0; i < weights_array.shape()[0]; i++) {
+             loss_weights[i] = py_weight_array(i);
+        }
+
         if (system_type == "acrobot_obs"){
             system = new two_link_acrobot_obs_t(obs_list, width);
             distance_computer = two_link_acrobot_obs_t::distance;
-            loss_weights[0] = 1;
-            loss_weights[1] = 1;
-            loss_weights[2] = 0.2;
-            loss_weights[3] = 0.2;
 
         } else if (system_type == "cartpole_obs"){
             system = new cart_pole_obs_t(obs_list, width);
             distance_computer = cart_pole_obs_t::distance;
-            loss_weights[0] = 1;
-            loss_weights[1] = 0.2;
-            loss_weights[2] = 1;
-            loss_weights[3] = 0.2;
         } else{
             std::cout<<"undefined system"<<std::endl;
             exit(-1);
         }
-
-
+        std::cout <<system_type<<std::endl;
         dt = integration_step;
         
         mpnet.reset(
@@ -103,7 +110,8 @@ public:
             num_sample, device_id, refine_lr, normalize)
             //  new networks::mpnet_t(mpnet_weight_path)
         );
-        
+        std::cout <<""<<std::endl;
+
         cem.reset(
             new trajectory_optimizers::CEM(
                 system, ns, nt,               
@@ -127,6 +135,16 @@ public:
         );
     }
 
+    py::object neural_step(bool refine, float refine_threshold, bool using_one_step_cost,
+        bool cost_reselection, double goal_bias) {
+        
+        //std::cout << "vector to torch obs vector.." << std::endl;
+        double* return_states = new double[system->get_state_dimension()*2]();
+        planner -> neural_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection, return_states, goal_bias);
+        py::safe_array<double> terminal_array({system->get_state_dimension()*2}, return_states);
+        return terminal_array;
+    }
+
     // /**
 	//  * @copydoc planner_t::step()
 	//  */
@@ -138,20 +156,51 @@ public:
         planner->mpc_step(system, integration_step);
     }
 
-    void neural_step(py::safe_array<double>& obs_voxel_array,
-        bool refine, float refine_threshold, bool using_one_step_cost,
-        bool cost_reselection) {
-        auto obs_voxel_data = obs_voxel_array.unchecked<1>();
-        std::vector<float> obs_vec;
-        for (unsigned i=0; i < obs_voxel_data.shape(0); i++)
-        {
-            obs_vec.push_back(float(obs_voxel_data(i)));
+    py::object steer(const py::safe_array<double> &start_array,
+                     const py::safe_array<double> &sample_array){
+
+        auto start_state_ref = start_array.unchecked<1>();
+        auto sample_array_ref = sample_array.unchecked<1>();
+
+        double* start = new double[system->get_state_dimension()]();
+        double* sample = new double[system->get_state_dimension()]();
+
+        for(int si = 0; si < system->get_state_dimension(); si++){
+            start[si] = start_state_ref[si];
+            sample[si] = sample_array_ref[si];
         }
-        //std::cout << "vector to torch obs vector.." << std::endl;
-        torch::Tensor obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
-        planner -> neural_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection);
-  
+
+        double *terminal_state = new double[system->get_state_dimension()]();
+
+        planner->steer(system, start, sample, 
+                       terminal_state, dt);
+        py::safe_array<double> terminal_array({start_array.shape()[0]}, terminal_state);
+        return terminal_array;
+
     }
+
+    py::object neural_sample(const py::safe_array<double> &state_array,
+                             bool refine, float refine_threshold, 
+                             bool using_one_step_cost, bool cost_reselection){
+
+                                 auto state_ref = state_array.unchecked<1>();
+                                 double * state = new double[system->get_state_dimension()]();
+                                 for(int si = 0; si < system->get_state_dimension(); si++){
+                                    state[si] = state_ref[si];
+                                }
+
+                                 double* neural_sample_state = new double[system->get_state_dimension()]();
+                                 planner->neural_sample(system, 
+                                                        state, 
+                                                        neural_sample_state, 
+                                                        obs_tensor, 
+                                                        refine, 
+                                                        refine_threshold, 
+                                                        using_one_step_cost, 
+                                                        cost_reselection);
+                                py::safe_array<double> neural_sample_state_array({system->get_state_dimension()}, neural_sample_state);
+                                return neural_sample_state_array;
+                             }
 
     /**
     * @copydoc sst_backend_t::nearest_vertex()
@@ -233,7 +282,7 @@ protected:
     std::vector<std::vector<double>> obs_list;
     double dt;
     double* loss_weights = new double[4]();
-
+    torch::Tensor obs_tensor;
 private:
 
 	/**
@@ -261,7 +310,9 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             int,
             int, int, int, int,
             double, double, double, double, double, double, double, double,
-            std::string, float, bool>(),
+            std::string, float, bool,
+            py::safe_array<double>&,
+            py::safe_array<double>&>(),
             "system_type"_a,
             "start_state"_a,
             "goal_state"_a,
@@ -277,7 +328,20 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "num_sample"_a,
             "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
             "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a,
-            "device_id"_a, "refine_lr"_a=0.2, "normalize"_a=true
+            "device_id"_a, "refine_lr"_a=0.2, "normalize"_a=true,
+            "weights_array"_a,
+            "obs_voxel_array"_a
+        )
+        .def("steer", &DSSTMPCWrapper::steer,
+            "start_array"_a,
+             "sample_array"_a
+        )
+        .def("neural_sample", &DSSTMPCWrapper::neural_sample,
+            "state_array"_a,
+            "refine"_a, 
+            "refine_threshold"_a, 
+            "using_one_step_cost"_a, 
+            "cost_reselection"_a
         )
         .def("step", &DSSTMPCWrapper::step,
             "min_time_steps"_a,
@@ -295,11 +359,11 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "duration"_a
         )
         .def("neural_step", &DSSTMPCWrapper::neural_step,
-            "obs_voxel_array"_a,
             "refine"_a=false,
             "refine_threshold"_a=0,
             "using_one_step_cost"_a=false,
-            "cost_reselection"_a=false
+            "cost_reselection"_a=false,
+            "goal_bias"_a=0
         )
         .def("get_solution", &DSSTMPCWrapper::get_solution)
         .def("get_number_of_nodes", &DSSTMPCWrapper::get_number_of_nodes)

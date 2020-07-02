@@ -65,4 +65,5 @@ namespace networks{
         delete normalized_goal;
         delete normalized_neural_sample_state;
     }
+    
 }

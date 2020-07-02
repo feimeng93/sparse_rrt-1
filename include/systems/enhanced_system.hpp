@@ -150,6 +150,18 @@ public:
 	 */ 
 	virtual void denormalize(double* normalized, double* state) = 0;
 
+	/**
+	 * valid_state
+	 */
+	virtual bool valid_state() = 0;
+
+
+	/**
+	 * @brief Intermediate storage for propagation.
+	 */
+	double* temp_state;
+
+
 protected:
 
 	/**
@@ -163,7 +175,6 @@ protected:
 	 * @details Determine if the current state is in collision or out of bounds.
 	 * @return True if this state was valid, false if not.
 	 */
-	virtual bool valid_state() = 0;
 
 	/**
 	 * @brief The dimensionality of the state space.
@@ -175,10 +186,6 @@ protected:
 	 */
 	unsigned control_dimension;
 
-	/**
-	 * @brief Intermediate storage for propagation.
-	 */
-	double* temp_state;
 
 };
 

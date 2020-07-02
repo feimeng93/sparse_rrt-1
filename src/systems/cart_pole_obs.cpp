@@ -56,9 +56,17 @@ bool cart_pole_obs_t::propagate(
         temp_state[2] = start_state[2];
         temp_state[3] = start_state[3];
         bool validity = false;
+        double enforced_control;
+        if(*control > 300){
+            enforced_control = 300;
+        } else if(*control < -300){
+            enforced_control = -300;
+        } else {
+            enforced_control = *control;
+        }
         for(int i=0;i<num_steps;i++)
         {
-                update_derivative(control);
+                update_derivative(&enforced_control);
                 temp_state[0] += integration_step*deriv[0];
                 temp_state[1] += integration_step*deriv[1];
                 temp_state[2] += integration_step*deriv[2];
@@ -267,5 +275,17 @@ double cart_pole_obs_t::distance(const double* point1, const double* point2, uns
     double val = fabs(point1[STATE_THETA]-point2[STATE_THETA]);
     if(val > M_PI)
             val = 2*M_PI-val;
-    return std::sqrt( val * val + pow(point1[0]-point2[0], 2.0) + pow(point1[1]-point2[1], 2.0)+ pow(point1[3]-point2[3], 2.0) );
+    return std::sqrt(val * val + pow(point1[0]-point2[0], 2.0) + pow(point1[1]-point2[1], 2.0)+ pow(point1[3]-point2[3], 2.0));
+    // return std::sqrt( val * val + pow(point1[0]-point2[0], 2.0)  );
+
 }
+
+// double cart_pole_obs_t::state_distance(const double* point1, const double* point2, unsigned int)
+// {
+//     double val = fabs(point1[STATE_THETA]-point2[STATE_THETA]);
+//     if(val > M_PI)
+//             val = 2*M_PI-val;
+//     return std::sqrt(val * val + pow(point1[0]-point2[0], 2.0) + pow(point1[1]-point2[1], 2.0)+ pow(point1[3]-point2[3], 2.0));
+//     // return std::sqrt( val * val + pow(point1[0]-point2[0], 2.0)  );
+
+// }

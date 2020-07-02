@@ -78,6 +78,7 @@ set(SOURCE_FILES
     src/systems/point.cpp
     src/systems/rally_car.cpp
     src/systems/two_link_acrobot.cpp
+    src/systems/quadrotor_obs.cpp
     #src/utilities/random.cpp
     #src/utilities/timer.cpp
     #src/image_creation/svg_image.cpp
@@ -105,6 +106,7 @@ set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
 set(MPC_SOURCE
     src/systems/cart_pole_obs.cpp
     src/systems/two_link_acrobot_obs.cpp
+    src/systems/quadrotor_obs.cpp
     src/trajectory_optimizers/cem.cpp)
 
 add_library(CEMMPC SHARED
@@ -112,19 +114,19 @@ add_library(CEMMPC SHARED
     )
 
 ### for steer module
-add_library(steer_module SHARED
-    src/systems/cart_pole_obs.cpp
-    src/systems/two_link_acrobot_obs.cpp
-    ${PROJECT_SOURCE_DIR}/src/steer_wrapper.cpp
-    )
-target_link_libraries(steer_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
+# add_library(steer_module SHARED
+#     src/systems/cart_pole_obs.cpp
+#     src/systems/two_link_acrobot_obs.cpp
+#     ${PROJECT_SOURCE_DIR}/src/steer_wrapper.cpp
+#     )
+# target_link_libraries(steer_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
 
 # Don't prepend wrapper library name with lib and add to Python libs.
-set_target_properties(steer_module PROPERTIES
-        PREFIX "_"
-        SUFFIX ".so"
-        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
-        )
+# set_target_properties(steer_module PROPERTIES
+#         PREFIX "_"
+#         SUFFIX ".so"
+#         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
+#         )
 #### for steer module
 
 set(DEEP_SMP_MODULE

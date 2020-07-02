@@ -1,6 +1,7 @@
 #include "trajectory_optimizers/cem.hpp"
 
 // #define DEBUG
+#define OBS_PENALTY 1000
 
 namespace trajectory_optimizers{
     void CEM::solve(const double* start, const double* goal, double* best_u, double* best_t){
@@ -29,7 +30,7 @@ namespace trajectory_optimizers{
             loss.push_back(std::make_pair(0., si));
         }
         // set early stop parameters
-        double min_loss = 1e3; // to +inf
+        double min_loss = OBS_PENALTY - 1e-1; // to +inf
         unsigned int early_stop_count = 0;
 
         // double* best_u = new double[c_dim];
@@ -103,7 +104,7 @@ namespace trajectory_optimizers{
                                 }
                         }
                         else{ // collision
-                            loss.at(si).first += 1000;
+                            loss.at(si).first += OBS_PENALTY;
                             active_mask[si] = false;
                         }
                     }
@@ -133,7 +134,7 @@ namespace trajectory_optimizers{
             #endif
 
             // early stop checking
-            if(loss.at(0).first < min_loss){
+            if(loss.at(0).first < min_loss /*&& loss.at(0).first < 100*/){
                 min_loss = loss.at(0).first;
                 int si = loss.at(0).second;
                 for(unsigned int ti = 0; ti < number_of_t; ti++){
@@ -149,7 +150,7 @@ namespace trajectory_optimizers{
 
             } else{
                 early_stop_count += 1;
-                if(early_stop_count >= it_max || min_loss >= 100){
+                if(early_stop_count >= it_max || min_loss >= OBS_PENALTY){
                     break;
                 }
             }

@@ -2,6 +2,8 @@
 #include "trajectory_optimizers/cem_config.hpp"
 
 #include "systems/two_link_acrobot_obs.hpp"
+#include "systems/quadrotor_obs.hpp"
+
 #include "systems/distance_functions.h"
 
 #include "motion_planners/deep_smp_mpc_sst.hpp"
@@ -19,8 +21,10 @@ int main(){
     std::vector<std::vector<double>> obs_list;
     double width = 5;
     obs_list.push_back(std::vector<double> {100.0, 200.0});
-    enhanced_system_t* model = new two_link_acrobot_obs_t(obs_list, width);
-   
+    
+    
+    // enhanced_system_t* model = new two_link_acrobot_obs_t(obs_list, width);
+    enhanced_system_t* model = new quadrotor_obs_t(1);
     // initialize cem
     double loss_weights[4] = {1, 1, 0.3, 0.3};
     int ns = 1024,
@@ -43,36 +47,47 @@ int main(){
     
     // initialzie mpnet
     networks::mpnet_cost_t mpnet(
-        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"),
-        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/costnet5000.pt"),
-        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cost_to_go_10k.pt"),
+        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cartpole_obs/mpnet_10k.pt"),
+        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cartpole_obs/cost_10k.pt"),
+        std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/cartpole_obs/cost_to_go_10k.pt"),
         5, "cuda:0", 0.2, true);
     //  networks::mpnet_t mpnet(
     //     std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"));
     deep_smp_mpc_sst_t* planner;
 
-    double in_start[4] = {0, 0, 0, 0};
-    double in_goal[4] = {3.14, 0, 0}; 
-    double in_radius = 2; 
+    // double in_start[4] = {0, 0, 0, 0};
+    // double in_goal[4] = {3.14, 0, 0}; 
+    // double in_radius = 2; 
+    double in_start[13] = {0, 0, 0, 
+                          0, 0, 0, 0,
+                          0, 0, 0,
+                          0, 0, 0,
+                          };
+    double in_goal[13] = {1, 1, 1, 
+                          0, 0, 0, 0,
+                          0, 0, 0,
+                          0, 0, 0,
+                          };;
+    double in_radius = 3; 
 
     torch::Tensor obs = torch::zeros({1,1,32,32}).to(at::kCUDA);
     torch::NoGradGuard no_grad;
 
-    planner = new deep_smp_mpc_sst_t(
-        in_start, in_goal,
-        in_radius,
-        model->get_state_bounds(),
-        model->get_control_bounds(),
-        two_link_acrobot_obs_t::distance,
-        0,
-        5e-1, 1e-2,
-        &cem,
-        &mpnet);
-    planner -> step(model, 10, 50, dt);
-    const double start[4] = {-0.42044061,  0.96072684, -0.84960626,  2.32958837};
-    const double goal[4] = {-0.48999742,  1.20535017, -0.02984635,  0.98378645};
-    double * terminal = new double[model->get_state_dimension()];
-    double duration = 0;
+    // planner = new deep_smp_mpc_sst_t(
+    //     in_start, in_goal,
+    //     in_radius,
+    //     model->get_state_bounds(),
+    //     model->get_control_bounds(),
+    //     two_link_acrobot_obs_t::distance,
+    //     0,
+    //     5e-1, 1e-2,
+    //     &cem,
+    //     &mpnet);
+    // planner -> step(model, 10, 50, dt);
+    // const double start[4] = {-0.42044061,  0.96072684, -0.84960626,  2.32958837};
+    // const double goal[4] = {-0.48999742,  1.20535017, -0.02984635,  0.98378645};
+    // double * terminal = new double[model->get_state_dimension()];
+    // double duration = 0;
     // planner -> steer(model, start, goal, &duration, terminal, dt);
     // planner -> neural_step(model, dt, obs, true, 0);
 
