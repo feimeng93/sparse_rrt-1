@@ -1,3 +1,7 @@
+
+
+#ifndef CEM_HPP
+#define CEM_HPP
 #include "systems/enhanced_system.hpp"
 #include <vector>
 #include <random>
@@ -5,8 +9,6 @@
 #include "iostream"
 #include <algorithm>
 
-#ifndef CEM_HPP
-#define CEM_HPP
 namespace trajectory_optimizers{
     class CEM{
         public:
@@ -75,9 +77,9 @@ namespace trajectory_optimizers{
             unsigned int get_num_step();
 
             // (state, goal) -> u, update mu_u and std_u
-            void solve(const double* start, const double* goal, double *best_u, double *best_t);
+            virtual void solve(const double* start, const double* goal, double *best_u, double *best_t);
             // (start, goal) -> state, update [path], slide mu_u and std_u
-            std::vector<std::vector<double>> rolling(double* start, double* goal);
+            virtual std::vector<std::vector<double>> rolling(double* start, double* goal);
             
             double converge_radius;
             double* weight;

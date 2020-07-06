@@ -1,13 +1,18 @@
-cmake_minimum_required(VERSION 2.8)
-project(SparseRRT)
+cmake_minimum_required(VERSION 3.9)
+project(SparseRRT LANGUAGES CXX CUDA)
+
+# enable_language(CUDA)
 
 # appending torch and cuda settings
+set (CMAKE_CUDA_FLAGS "-std=c++11")  # this line is important to compile CUDA with CXX in gcc-5
 list(APPEND CMAKE_PREFIX_PATH
     /media/arclabdl1/HD1/Linjun/external/libtorch
     /usr/local/cuda
     )
 set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
 find_package(Torch REQUIRED)
+find_package(CUDA QUIET REQUIRED)
+
 
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
@@ -15,6 +20,8 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 set(CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS}")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+set(CMAKE_CXX_STANDARD 11)
+ 
 set(INCLUDE_DIRECTORIES include)
 
 add_definitions(-O3)
@@ -49,13 +56,13 @@ execute_process(
 
 
 include_directories(
-        # ${Numpy_INCLUDE_DIRS}  # this should come before PYTHON includes because it also contains system numpy
-        ${PYTHON_INCLUDE_DIRS}
-        "${PROJECT_SOURCE_DIR}/include"
-        "${PROJECT_SOURCE_DIR}/deps/pybind11/include"
-        # #torch
-        ${TORCH_INCLUDE_DIRS}
-        )
+    # ${Numpy_INCLUDE_DIRS}  # this should come before PYTHON includes because it also contains system numpy
+    ${PYTHON_INCLUDE_DIRS}
+    "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/deps/pybind11/include"
+    # #torch
+    ${TORCH_INCLUDE_DIRS}
+    )
 
 set(PLANNING_UTILS
     src/nearest_neighbors/graph_nearest_neighbors.cpp
@@ -84,7 +91,7 @@ set(SOURCE_FILES
     #src/image_creation/svg_image.cpp
     #src/image_creation/planner_visualization.cpp
     src/systems/distance_functions.cpp
-   ${PLANNING_UTILS}
+    ${PLANNING_UTILS}
 )
 
 add_library(${PROJECT_NAME} STATIC
@@ -100,14 +107,19 @@ set_target_properties(sst_module PROPERTIES
         SUFFIX ".so"
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
         )
-set_property(TARGET sst_module PROPERTY CXX_STANDARD 14)
+set_property(TARGET sst_module PROPERTY CXX_STANDARD 11)
+
+#set_source_files_properties(src/trajectory_optimizers/cem_cuda.cu PROPERTIES LANGUAGE CUDA)
 
 # for mpc and cem
 set(MPC_SOURCE
     src/systems/cart_pole_obs.cpp
     src/systems/two_link_acrobot_obs.cpp
     src/systems/quadrotor_obs.cpp
-    src/trajectory_optimizers/cem.cpp)
+    src/trajectory_optimizers/cem.cpp
+    src/trajectory_optimizers/cem_cuda.cu)
+
+# set_property(TARGET CEMMPC PROPERTY CXX_STANDARD 11)
 
 add_library(CEMMPC SHARED
     ${MPC_SOURCE}
@@ -148,16 +160,18 @@ target_link_libraries(deep_smp_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEM
 set_target_properties(deep_smp_module PROPERTIES
         PREFIX "_"
         SUFFIX ".so"
+        CXX_STANDARD 11
+
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
         )
-set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 14)
+set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
 
 
 # for all test
 add_executable(
     test_mpc
     src/tests/test_mpc.cpp
-    #${MPC_SOURCE}
+    ${MPC_SOURCE}
     )
 target_link_libraries(test_mpc CEMMPC)
 

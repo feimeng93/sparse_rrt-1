@@ -11,18 +11,25 @@ namespace networks{
         int num_sample, std::string device_id, float refine_lr, bool normalize) : mpnet_t(network_weights_path),
         num_sample(num_sample), device_id(device_id), refine_lr(refine_lr), normalize(normalize)
         {
-            network_torch_module_ptr.reset(new torch::jit::script::Module(
+            if (network_weights_path.length() > 0) {
+                network_torch_module_ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(network_weights_path)));
-
-            cost_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
+            }
+           
+            if (cost_predictor_weights_path.length() > 0) {
+                 cost_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(cost_predictor_weights_path)));
-            network_torch_module_ptr->to(torch::Device(device_id));;
-            cost_predictor_torch_module_ptr->to(torch::Device(device_id));
+                network_torch_module_ptr->to(torch::Device(device_id));
+                cost_predictor_torch_module_ptr->to(torch::Device(device_id));
+            }
+           
             
-            
-            cost_to_go_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
+            if (cost_to_go_predictor_weights_path.length() > 0) {
+                cost_to_go_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(cost_to_go_predictor_weights_path)));
-            cost_to_go_predictor_torch_module_ptr->to(torch::Device(device_id));
+                cost_to_go_predictor_torch_module_ptr->to(torch::Device(device_id));
+            }
+            
     }
 
     mpnet_cost_t::~mpnet_cost_t(){
@@ -45,12 +52,14 @@ namespace networks{
     }
 
     
-    void mpnet_cost_t::mpnet_sample(enhanced_system_t* system, torch::Tensor env_vox_tensor,
+    void mpnet_cost_t::mpnet_sample(enhanced_system_t* system, torch::Tensor& env_vox_tensor,
         const double* state, double* goal_state, double* neural_sample_state, bool refine, float refine_threshold,
         bool using_one_step_cost, bool cost_reselection){
+        
         double* normalized_state = new double[system->get_state_dimension()];
         double* normalized_goal = new double[system->get_state_dimension()];
         double* normalized_neural_sample_state = new double[system->get_state_dimension()];
+        
         system -> normalize(state, normalized_state);
         system -> normalize(goal_state, normalized_goal);
         std::vector<torch::jit::IValue> input_container;
@@ -130,7 +139,6 @@ namespace networks{
                 predicted_costs = this -> forward_cost(input_container).to(torch::Device(device_id));
                 best_index_tensor = at::argmin(predicted_costs).to(torch::Device(device_id));
             }
-        
             best_index = best_index_tensor.item<int>();
         } else {
             best_index = 0;
@@ -148,5 +156,51 @@ namespace networks{
     }
 
     
+
+
+    void mpnet_cost_t::mpnet_sample_batch(enhanced_system_t* system, torch::Tensor& env_vox_tensor,
+        const double* state, double* goal_state, double* neural_sample_state, bool refine, float refine_threshold,
+        bool using_one_step_cost, bool cost_reselection, const int NP){
+        
+        double* normalized_state = new double[system->get_state_dimension()];
+        double* normalized_goal = new double[system->get_state_dimension()];
+        double* normalized_neural_sample_state = new double[NP*system->get_state_dimension()];
+        
+        system -> normalize(state, normalized_state);
+        system -> normalize(goal_state, normalized_goal);
+        std::vector<torch::jit::IValue> input_container;
+        torch::Tensor state_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
+        torch::Tensor goal_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
+        // set value state_goal with dim 1 x 8
+        for(unsigned int si = 0; si < system->get_state_dimension(); si++){
+            state_tensor[0][si] = normalized_state[si];    
+        }
+        for(unsigned int si = 0; si < system->get_state_dimension(); si++){
+            goal_tensor[0][si] = normalized_goal[si]; 
+        }
+        
+        at::Tensor state_tensor_expand = state_tensor.repeat({NP, 1}).to(torch::Device(device_id));
+        at::Tensor goal_tensor_expand = goal_tensor.repeat({NP, 1}).to(torch::Device(device_id));
+
+        torch::Tensor state_goal_tensor = at::cat({state_tensor_expand, goal_tensor_expand}, 1).to(torch::Device(device_id));
+        // for multiple sampling
+        at::Tensor env_vox_tensor_expand = env_vox_tensor.repeat({NP, 1, 1, 1}).to(torch::Device(device_id));
+        input_container.push_back(state_goal_tensor);
+        input_container.push_back(env_vox_tensor_expand);
+        at::Tensor predicted_state_tensor = this -> forward(input_container).to(torch::Device(device_id));
+       
+
+        for (unsigned int pi = 0; pi < NP; pi++)
+        {
+            for(unsigned int si = 0; si < system->get_state_dimension(); si++){
+                normalized_neural_sample_state[pi*system->get_state_dimension()+si] = predicted_state_tensor[pi][si].item<double>();
+            }
+            system -> denormalize(normalized_neural_sample_state+pi*system->get_state_dimension(), neural_sample_state+pi*system->get_state_dimension());
+
+        }
+        delete normalized_state;
+        delete normalized_goal;
+        delete normalized_neural_sample_state;
+    }
 
 }

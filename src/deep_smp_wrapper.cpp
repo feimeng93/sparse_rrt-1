@@ -8,6 +8,7 @@
 #include "systems/quadrotor_obs.hpp"
 
 #include "trajectory_optimizers/cem.hpp"
+#include "trajectory_optimizers/cem_cuda.hpp"
 
 #include "networks/mpnet.hpp"
 #include "networks/mpnet_cost.hpp"
@@ -33,6 +34,7 @@ public:
 	 */
     DSSTMPCWrapper(
             std::string system_string,
+            std::string solver_type,
             const py::safe_array<double> &start_state_array,
             const py::safe_array<double> &goal_state_array,
             double goal_radius,
@@ -45,12 +47,14 @@ public:
             std::string mpnet_weight_path, std::string cost_predictor_weight_path,
             std::string cost_to_go_predictor_weight_path,
             int num_sample,
-            int ns, int nt, int ne, int max_it,
+            int np, int ns, int nt, int ne, int max_it,
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
             std::string device_id, float refine_lr, bool normalize,
             py::safe_array<double>& weights_array,
             py::safe_array<double>& obs_voxel_array
     ){
+
+
         if(system_string.size()==0){
             system_string="cartpole_obs";
         }
@@ -82,7 +86,7 @@ public:
         {
             obs_vec.push_back(float(obs_voxel_data(i)));
         }
-        obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(at::kCUDA);
+        obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(torch::Device(device_id));
 
         auto py_weight_array = weights_array.unchecked<1>();
         for (unsigned int i = 0; i < weights_array.shape()[0]; i++) {
@@ -112,14 +116,31 @@ public:
         );
         std::cout <<""<<std::endl;
 
-        cem.reset(
-            new trajectory_optimizers::CEM(
-                system, ns, nt,               
-                ne, converge_r, 
-                mu_u, std_u, 
-                mu_t, std_t, t_max, 
-                dt, loss_weights, max_it, verbose, step_size)
-        );
+
+        if (solver_type == "cem_cuda")
+        {
+            
+            cem.reset(
+                new trajectory_optimizers::CEM_CUDA(
+                    system, np, ns, nt,               
+                    ne, converge_r, obs_list, 
+                    mu_u, std_u, 
+                    mu_t, std_t, t_max, 
+                    dt, loss_weights, max_it, verbose, step_size)
+            );
+        }
+        else if (solver_type == "cem")
+         {
+             cem.reset(
+                 new trajectory_optimizers::CEM(
+                     system, ns, nt,               
+                     ne, converge_r, 
+                     mu_u, std_u, 
+                     mu_t, std_t, t_max, 
+                     dt, loss_weights, max_it, verbose, step_size)
+             );
+         }
+
        
         planner.reset(
             new deep_smp_mpc_sst_t(
@@ -139,9 +160,33 @@ public:
         bool cost_reselection, double goal_bias) {
         
         //std::cout << "vector to torch obs vector.." << std::endl;
-        double* return_states = new double[system->get_state_dimension()*2]();
+        double* return_states = new double[system->get_state_dimension()*3]();
         planner -> neural_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection, return_states, goal_bias);
-        py::safe_array<double> terminal_array({system->get_state_dimension()*2}, return_states);
+        py::safe_array<double> terminal_array({system->get_state_dimension()*3}, return_states);
+        return terminal_array;
+    }
+
+    py::object neural_step_batch(bool refine, float refine_threshold, bool using_one_step_cost,
+        bool cost_reselection, double goal_bias, const int NP) {
+        
+        //std::cout << "vector to torch obs vector.." << std::endl;
+        double* return_states = new double[NP*system->get_state_dimension()*3]();
+        planner -> neural_step_batch(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection, return_states, goal_bias, NP);
+        py::safe_array<double> terminal_array({NP, (int) system->get_state_dimension(), 3});
+
+        //std::cout << "inside deep_smp_wrapper::neural_step_batch. before copying to terminal_array_ref" << std::endl;
+        auto terminal_array_ref = terminal_array.mutable_unchecked<3>();
+        for (unsigned pi = 0; pi < NP; pi ++)
+        {
+            for (unsigned si = 0; si < system->get_state_dimension(); si ++)
+            {
+                terminal_array_ref(pi, si, 0) = return_states[(pi*system->get_state_dimension()+si)*3];
+                terminal_array_ref(pi, si, 1) = return_states[(pi*system->get_state_dimension()+si)*3+1];
+                terminal_array_ref(pi, si, 2) = return_states[(pi*system->get_state_dimension()+si)*3+2];
+
+            }
+        }
+
         return terminal_array;
     }
 
@@ -175,32 +220,114 @@ public:
         planner->steer(system, start, sample, 
                        terminal_state, dt);
         py::safe_array<double> terminal_array({start_array.shape()[0]}, terminal_state);
+
+        delete start;
+        delete sample;
+        return terminal_array;
+
+    }
+    py::object steer_batch(const py::safe_array<double> &start_array,
+                     const py::safe_array<double> &sample_array, const int NP){
+
+        auto start_state_ref = start_array.unchecked<2>();
+        auto sample_array_ref = sample_array.unchecked<2>();
+
+        double* start = new double[NP*system->get_state_dimension()]();
+        double* sample = new double[NP*system->get_state_dimension()]();
+
+        for (unsigned pi = 0; pi < NP; pi++)
+        {
+            for(int si = 0; si < system->get_state_dimension(); si++){
+                start[pi*system->get_state_dimension()+si] = start_state_ref(pi, si);
+                sample[pi*system->get_state_dimension()+si] = sample_array_ref(pi, si);
+            }
+
+        }
+
+        double *terminal_state = new double[NP*system->get_state_dimension()]();
+
+        double* duration = new double[NP]();
+        planner->steer_batch(system, start, sample, 
+                       terminal_state, dt, NP, duration);
+        py::safe_array<double> terminal_array({start_array.shape()[0], start_array.shape()[1]});
+        auto terminal_array_ref = terminal_array.mutable_unchecked<2>();
+        std::cout<<"running"<<std::endl;
+        for (unsigned pi = 0; pi < NP; pi ++)
+        {
+            for (unsigned si = 0; si < system->get_state_dimension(); si++)
+            {
+                terminal_array_ref(pi, si) = terminal_state[pi*system->get_state_dimension() + si];
+            }
+        }
+        delete terminal_state;
+        delete duration;
+
         return terminal_array;
 
     }
 
-    py::object neural_sample(const py::safe_array<double> &state_array,
-                             bool refine, float refine_threshold, 
-                             bool using_one_step_cost, bool cost_reselection){
 
-                                 auto state_ref = state_array.unchecked<1>();
-                                 double * state = new double[system->get_state_dimension()]();
-                                 for(int si = 0; si < system->get_state_dimension(); si++){
-                                    state[si] = state_ref[si];
-                                }
 
-                                 double* neural_sample_state = new double[system->get_state_dimension()]();
-                                 planner->neural_sample(system, 
-                                                        state, 
-                                                        neural_sample_state, 
-                                                        obs_tensor, 
-                                                        refine, 
-                                                        refine_threshold, 
-                                                        using_one_step_cost, 
-                                                        cost_reselection);
-                                py::safe_array<double> neural_sample_state_array({system->get_state_dimension()}, neural_sample_state);
-                                return neural_sample_state_array;
-                             }
+    py::object neural_sample(const py::safe_array<double> &state_array, bool refine, float refine_threshold, 
+        bool using_one_step_cost, bool cost_reselection){
+
+            auto state_ref = state_array.unchecked<1>();
+            double * state = new double[system->get_state_dimension()]();
+            for(int si = 0; si < system->get_state_dimension(); si++){
+                state[si] = state_ref[si];
+            }
+
+            double* neural_sample_state = new double[system->get_state_dimension()]();
+            planner->neural_sample(system, 
+                                state, 
+                                neural_sample_state, 
+                                obs_tensor, 
+                                refine, 
+                                refine_threshold, 
+                                using_one_step_cost, 
+                                cost_reselection);
+            py::safe_array<double> neural_sample_state_array({system->get_state_dimension()}, neural_sample_state);
+            delete state;
+        
+            return neural_sample_state_array;
+        }
+
+
+
+    py::object neural_sample_batch(const py::safe_array<double> &state_array, bool refine, float refine_threshold, 
+        bool using_one_step_cost, bool cost_reselection, const int NP){
+
+            auto state_ref = state_array.unchecked<1>();
+            double * state = new double[system->get_state_dimension()]();
+            for(int si = 0; si < system->get_state_dimension(); si++){
+                state[si] = state_ref[si];
+            }
+
+            double* neural_sample_state = new double[NP*system->get_state_dimension()]();
+            planner->neural_sample_batch(system, 
+                                state, 
+                                neural_sample_state, 
+                                obs_tensor, 
+                                refine, 
+                                refine_threshold, 
+                                using_one_step_cost, 
+                                cost_reselection,
+                                NP);
+ 
+        int state_dim = system->get_state_dimension();                               
+        py::safe_array<double> neural_sample_state_array({NP, state_dim});
+        auto neural_sample_state_array_ref = neural_sample_state_array.mutable_unchecked<2>();
+        for (unsigned pi = 0; pi < NP; pi ++)
+        {
+            for (unsigned si = 0; si < system->get_state_dimension(); si ++)
+            {
+                neural_sample_state_array_ref(pi, si) = neural_sample_state[pi*system->get_state_dimension() + si];
+            }
+
+        }
+
+        return neural_sample_state_array;
+        }
 
     /**
     * @copydoc sst_backend_t::nearest_vertex()
@@ -283,6 +410,8 @@ protected:
     double dt;
     double* loss_weights = new double[4]();
     torch::Tensor obs_tensor;
+    torch::NoGradGuard no_grad;
+
 private:
 
 	/**
@@ -296,6 +425,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
     py::class_<DSSTMPCWrapper>(m, "DSSTMPCWrapper")
         .def(py::init<
             std::string,
+            std::string,
             const py::safe_array<double>&,
             const py::safe_array<double>&,
             double,
@@ -308,40 +438,54 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             std::string, std::string, 
             std::string, 
             int,
-            int, int, int, int,
+            int, int, int, int, int,
             double, double, double, double, double, double, double, double,
             std::string, float, bool,
             py::safe_array<double>&,
             py::safe_array<double>&>(),
             "system_type"_a,
+            "solver_type"_a="cem",
             "start_state"_a,
             "goal_state"_a,
             "goal_radius"_a,
-            "random_seed"_a,
+            "random_seed"_a=0,
             "sst_delta_near"_a,
             "sst_delta_drain"_a,
-            "obs_list"_a,
-            "width"_a,
-            "verbose"_a,
-            "mpnet_weight_path"_a, "cost_predictor_weight_path"_a,
-            "cost_to_go_predictor_weight_path"_a,
-            "num_sample"_a,
-            "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
+            "obs_list"_a=py::safe_array<double>(),
+            "width"_a=0,
+            "verbose"_a=false,
+            "mpnet_weight_path"_a="", "cost_predictor_weight_path"_a="",
+            "cost_to_go_predictor_weight_path"_a="",
+            "num_sample"_a=1,
+            "np"_a=1, "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
             "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a,
-            "device_id"_a, "refine_lr"_a=0.2, "normalize"_a=true,
-            "weights_array"_a,
-            "obs_voxel_array"_a
+            "device_id"_a="cuda:0", "refine_lr"_a=0.2, "normalize"_a=true,
+            "weights_array"_a=py::safe_array<double>(),
+            "obs_voxel_array"_a=py::safe_array<double>()
         )
         .def("steer", &DSSTMPCWrapper::steer,
             "start_array"_a,
              "sample_array"_a
         )
+         .def("steer_batch", &DSSTMPCWrapper::steer_batch,
+            "start_array"_a,
+             "sample_array"_a,
+             "num_of_problems"_a
+        )       
         .def("neural_sample", &DSSTMPCWrapper::neural_sample,
             "state_array"_a,
-            "refine"_a, 
-            "refine_threshold"_a, 
-            "using_one_step_cost"_a, 
-            "cost_reselection"_a
+            "refine"_a=false, 
+            "refine_threshold"_a=0.2, 
+            "using_one_step_cost"_a=false, 
+            "cost_reselection"_a=false
+        )
+        .def("neural_sample_batch", &DSSTMPCWrapper::neural_sample_batch,
+            "state_array"_a,
+            "refine"_a=false, 
+            "refine_threshold"_a=0.2, 
+            "using_one_step_cost"_a=false, 
+            "cost_reselection"_a=false,
+            "num_of_problems"_a
         )
         .def("step", &DSSTMPCWrapper::step,
             "min_time_steps"_a,
@@ -364,6 +508,14 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "using_one_step_cost"_a=false,
             "cost_reselection"_a=false,
             "goal_bias"_a=0
+        )
+        .def("neural_step_batch", &DSSTMPCWrapper::neural_step_batch,
+            "refine"_a=false,
+            "refine_threshold"_a=0,
+            "using_one_step_cost"_a=false,
+            "cost_reselection"_a=false,
+            "goal_bias"_a=0,
+            "num_of_problem"_a=1
         )
         .def("get_solution", &DSSTMPCWrapper::get_solution)
         .def("get_number_of_nodes", &DSSTMPCWrapper::get_number_of_nodes)
