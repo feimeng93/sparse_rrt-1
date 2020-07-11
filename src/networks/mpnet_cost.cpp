@@ -158,7 +158,7 @@ namespace networks{
     
 
 
-    void mpnet_cost_t::mpnet_sample_batch(enhanced_system_t* system, torch::Tensor& env_vox_tensor,
+    void mpnet_cost_t::mpnet_sample_single_batch(enhanced_system_t* system, torch::Tensor& env_vox_tensor,
         const double* state, double* goal_state, double* neural_sample_state, bool refine, float refine_threshold,
         bool using_one_step_cost, bool cost_reselection, const int NP){
         
@@ -203,4 +203,69 @@ namespace networks{
         delete normalized_neural_sample_state;
     }
 
+
+
+    void mpnet_cost_t::mpnet_sample_batch(enhanced_system_t* system, torch::Tensor& env_vox_tensor,
+        const double* state, double* goal_state, double* neural_sample_state, bool refine, float refine_threshold,
+        bool using_one_step_cost, bool cost_reselection, const int NP){
+        
+        double* normalized_state = new double[NP*system->get_state_dimension()];
+        double* normalized_goal = new double[NP*system->get_state_dimension()];
+        double* normalized_neural_sample_state = new double[NP*system->get_state_dimension()];
+        for (unsigned i=0; i<NP; i++)
+        {
+            system -> normalize(state+i*system->get_state_dimension(), normalized_state+i*system->get_state_dimension());
+
+            // only one goal
+            system -> normalize(goal_state, normalized_goal+i*system->get_state_dimension());
+            //std::cout << "normalization... pi=" << i << std::endl;
+            //std::cout << "before normalization, state = " << state[i*system->get_state_dimension()+0] << ", " << state[i*system->get_state_dimension()+1] << ", " << state[i*system->get_state_dimension()+2] << ", " << state[i*system->get_state_dimension()+3] << "]" << std::endl;
+            //std::cout << "after normalization, state = " << normalized_state[i*system->get_state_dimension()+0] << ", " << normalized_state[i*system->get_state_dimension()+1] << ", " << normalized_state[i*system->get_state_dimension()+2] << ", " << normalized_state[i*system->get_state_dimension()+3] << "]" << std::endl;
+            
+            //std::cout << "normalization... pi=" << i << std::endl;
+            //std::cout << "before normalization, goal = " << goal_state[i*system->get_state_dimension()+0] << ", " << goal_state[i*system->get_state_dimension()+1] << ", " << goal_state[i*system->get_state_dimension()+2] << ", " << goal_state[i*system->get_state_dimension()+3] << "]" << std::endl;
+            //std::cout << "after normalization, goal = " << normalized_goal[i*system->get_state_dimension()+0] << ", " << normalized_goal[i*system->get_state_dimension()+1] << ", " << normalized_goal[i*system->get_state_dimension()+2] << ", " << normalized_goal[i*system->get_state_dimension()+3] << "]" << std::endl;
+
+        }
+        std::vector<torch::jit::IValue> input_container;
+        torch::Tensor state_tensor = torch::ones({NP, 4}).to(torch::Device(device_id)); 
+        torch::Tensor goal_tensor = torch::ones({NP, 4}).to(torch::Device(device_id)); 
+        // set value state_goal with dim 1 x 8
+        for (unsigned int pi=0; pi<NP; pi++)
+        {
+            for(unsigned int si = 0; si < system->get_state_dimension(); si++){
+                state_tensor[pi][si] = normalized_state[pi*system->get_state_dimension()+si];    
+            }
+            for(unsigned int si = 0; si < system->get_state_dimension(); si++){
+                goal_tensor[pi][si] = normalized_goal[pi*system->get_state_dimension()+si]; 
+            }
+        }
+        at::Tensor state_tensor_expand = state_tensor;
+        at::Tensor goal_tensor_expand = goal_tensor;
+        //at::Tensor state_tensor_expand = state_tensor.repeat({NP, 1}).to(torch::Device(device_id));
+        //at::Tensor goal_tensor_expand = goal_tensor.repeat({NP, 1}).to(torch::Device(device_id));
+
+        torch::Tensor state_goal_tensor = at::cat({state_tensor_expand, goal_tensor_expand}, 1).to(torch::Device(device_id));
+        // for multiple sampling
+        at::Tensor env_vox_tensor_expand = env_vox_tensor.repeat({NP, 1, 1, 1}).to(torch::Device(device_id));
+        input_container.push_back(state_goal_tensor);
+        input_container.push_back(env_vox_tensor_expand);
+        at::Tensor predicted_state_tensor = this -> forward(input_container).to(torch::Device(device_id));
+        
+
+        for (unsigned int pi = 0; pi < NP; pi++)
+        {
+            for(unsigned int si = 0; si < system->get_state_dimension(); si++){
+                normalized_neural_sample_state[pi*system->get_state_dimension()+si] = predicted_state_tensor[pi][si].item<double>();
+            }
+            system -> denormalize(normalized_neural_sample_state+pi*system->get_state_dimension(), neural_sample_state+pi*system->get_state_dimension());
+            //std::cout << "denormalization... pi=" << pi << std::endl;
+            //std::cout << "before denormalization, goal = " << normalized_neural_sample_state[pi*system->get_state_dimension()+0] << ", " << normalized_neural_sample_state[pi*system->get_state_dimension()+1] << ", " << normalized_neural_sample_state[pi*system->get_state_dimension()+2] << ", " << normalized_neural_sample_state[pi*system->get_state_dimension()+3] << "]" << std::endl;
+            //std::cout << "after denormalization, goal = " << neural_sample_state[pi*system->get_state_dimension()+0] << ", " << neural_sample_state[pi*system->get_state_dimension()+1] << ", " << neural_sample_state[pi*system->get_state_dimension()+2] << ", " << neural_sample_state[pi*system->get_state_dimension()+3] << "]" << std::endl;
+
+        }
+        delete normalized_state;
+        delete normalized_goal;
+        delete normalized_neural_sample_state;
+    }
 }

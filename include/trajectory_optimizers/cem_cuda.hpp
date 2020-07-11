@@ -14,10 +14,12 @@
 // #include "cuda_dep.h"
 #include <curand.h>
 #include <curand_kernel.h>
-#include <thrust/sort.h>
-#include <thrust/device_ptr.h>
-#include <thrust/sequence.h>
-#include <thrust/device_vector.h>
+#include <algorithm>
+
+//#include <thrust/sort.h>
+//#include <thrust/device_ptr.h>
+//#include <thrust/sequence.h>
+//#include <thrust/device_vector.h>
 //#include <device_launch_parameters.h>   // this is required in Windows. But it should be deleted in Linux
 
 #include "trajectory_optimizers/cem.hpp"
@@ -69,6 +71,8 @@ namespace trajectory_optimizers{
                 cudaFree(d_std_control);
                 cudaFree(d_std_time);
                 cudaFree(d_loss);
+                cudaFree(d_top_k_loss);
+
                 cudaFree(d_loss_ind);
                 cudaFree(d_obs_list);
                 cudaFree(d_active_mask);
@@ -113,12 +117,13 @@ namespace trajectory_optimizers{
             enhanced_system_t *system;
             double *temp_state, *d_temp_state, *d_control, *d_deriv, *d_time;
             double *d_mean_time, *d_mean_control, *d_std_control, *d_std_time;
-            double *d_loss;
+            double *d_loss, *loss, *d_top_k_loss;
             int *d_loss_ind, *loss_ind;
             double /* *best_ut,*/ *d_best_ut;
             // for obstacles
             double* d_obs_list, *obs_list;
             bool* d_active_mask;
+            std::vector<std::pair<double, int>> loss_pair;
 
             // for multi-start-goal
             double *d_start_state, *d_goal_state;

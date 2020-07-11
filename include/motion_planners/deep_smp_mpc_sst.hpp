@@ -94,7 +94,10 @@ public:
 	 virtual void neural_step_batch(enhanced_system_t* system, double integration_step, 
 	 	torch::Tensor& env_vox_tensor, bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection,
 		double* states, double goal_bias, const int NP);
-	
+
+	 virtual void neural_step_single_batch(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
+    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, const int NP);
+
 	// Expose two functions public to enable the python wrappers to call 
 	/**
 	 * @brief Finds a node to propagate from.
@@ -128,6 +131,15 @@ public:
 	virtual void neural_sample_batch(enhanced_system_t* system, const double* nearest, 
 		double* neural_sample_state, torch::Tensor& env_vox_tensor, bool refine, float refine_threshold,
 		bool using_one_step_cost, bool cost_reselection, const int NP);
+
+	virtual void deep_smp_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
+    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias);
+
+	
+	virtual void deep_smp_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
+    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, int NP);
+
+	
 	// double goal_bias;
 protected:
     /**
@@ -149,6 +161,7 @@ protected:
      * @brief The MPNet Pointer.
      */
 	networks::mpnet_cost_t *mpnet_ptr;
+
 	/**
 	 * @brief Check if the currently created state is close to a witness.
 	 * @details Check if the currently created state is close to a witness.
@@ -208,6 +221,13 @@ protected:
 	 * @brief Container for witness nodes (to avoid memory leaks)
 	 */
     std::vector<sample_node_t*> witness_nodes;
+	/**
+	 * 
+	 */
+	double* current_state;
+	int smp_counter;
+
+	// double* start_state;
 };
 
 #endif

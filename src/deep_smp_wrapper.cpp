@@ -82,7 +82,7 @@ public:
 
         auto obs_voxel_data = obs_voxel_array.unchecked<1>();
         std::vector<float> obs_vec;
-        for (unsigned i=0; i < obs_voxel_data.shape(0); i++)
+        for (unsigned i = 0; i < obs_voxel_data.shape(0); i++)
         {
             obs_vec.push_back(float(obs_voxel_data(i)));
         }
@@ -104,7 +104,7 @@ public:
             std::cout<<"undefined system"<<std::endl;
             exit(-1);
         }
-        std::cout <<system_type<<std::endl;
+        // std::cout <<system_type<<std::endl;
         dt = integration_step;
         
         mpnet.reset(
@@ -165,6 +165,20 @@ public:
         py::safe_array<double> terminal_array({system->get_state_dimension()*3}, return_states);
         return terminal_array;
     }
+    py::object deep_smp_step(bool refine, float refine_threshold, bool using_one_step_cost,
+        bool cost_reselection, double goal_bias, int NP) {
+        
+        //std::cout << "vector to torch obs vector.." << std::endl;
+        double* return_states = new double[system->get_state_dimension()*3]();
+        if(NP > 1){
+            planner -> deep_smp_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection, return_states, goal_bias, NP);
+
+        } else {
+            planner -> deep_smp_step(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection, return_states, goal_bias);
+        }
+        py::safe_array<double> terminal_array({system->get_state_dimension()*3}, return_states);
+        return terminal_array;
+    }
 
     py::object neural_step_batch(bool refine, float refine_threshold, bool using_one_step_cost,
         bool cost_reselection, double goal_bias, const int NP) {
@@ -183,10 +197,9 @@ public:
                 terminal_array_ref(pi, si, 0) = return_states[(pi*system->get_state_dimension()+si)*3];
                 terminal_array_ref(pi, si, 1) = return_states[(pi*system->get_state_dimension()+si)*3+1];
                 terminal_array_ref(pi, si, 2) = return_states[(pi*system->get_state_dimension()+si)*3+2];
-
             }
         }
-
+        delete return_states;
         return terminal_array;
     }
 
@@ -305,14 +318,14 @@ public:
 
             double* neural_sample_state = new double[NP*system->get_state_dimension()]();
             planner->neural_sample_batch(system, 
-                                state, 
-                                neural_sample_state, 
-                                obs_tensor, 
-                                refine, 
-                                refine_threshold, 
-                                using_one_step_cost, 
-                                cost_reselection,
-                                NP);
+                                         state, 
+                                         neural_sample_state, 
+                                         obs_tensor, 
+                                         refine, 
+                                         refine_threshold, 
+                                         using_one_step_cost, 
+                                         cost_reselection,
+                                         NP);
  
         int state_dim = system->get_state_dimension();                               
         py::safe_array<double> neural_sample_state_array({NP, state_dim});
@@ -508,6 +521,14 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "using_one_step_cost"_a=false,
             "cost_reselection"_a=false,
             "goal_bias"_a=0
+        )
+        .def("deep_smp_step", &DSSTMPCWrapper::deep_smp_step,
+            "refine"_a, 
+            "refine_threshold"_a, 
+            "using_one_step_cost"_a,
+            "cost_reselection"_a,
+            "goal_bias"_a=0,
+            "NP"_a=1
         )
         .def("neural_step_batch", &DSSTMPCWrapper::neural_step_batch,
             "refine"_a=false,

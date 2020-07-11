@@ -1,6 +1,10 @@
 #include "trajectory_optimizers/cem_cuda.hpp"
 #include "systems/enhanced_system.hpp"
 
+//#define PROFILE
+
+#include <chrono>
+
 // #define DEBUG
 #define I 10
 #define L 2.5
@@ -254,6 +258,46 @@ namespace trajectory_optimizers{
 
     }
 
+    
+    __global__
+    void get_approx_topk_loss(double* loss, const int NS, double* top_k_loss, int* top_k_loss_ind, const int N_ELITE){
+        //printf("%d\n", id);
+        /**
+        * #TODO
+        * this uses the id to map to one of the k buckets, and then only find the min loss for that index.
+        * this is approximate as the result may not be the top k.
+        * for consistency against previous method, our inputs are of the following dimension:
+        *       top_k_loss: NPxNS
+        *       top_k_loss_ind: NPxNS
+        * Since we have NP problems, our bucket is of size: NP x N_ELITE
+        *       grid size: (1, 1, 1)
+        *       block size: (NP, 1, NE)
+        */
+        unsigned int np = blockIdx.x * blockDim.x + threadIdx.x;
+        unsigned int ne = blockIdx.z * blockDim.z + threadIdx.z;
+
+        // loop over NE to find best k
+        double min_loss = 10*OBS_PENALTY;
+        int min_loss_ind = -1;
+        for (unsigned int ns_div_ne = 0; ns_div_ne < NS/N_ELITE; ns_div_ne++)
+        {
+            unsigned int ns = ns_div_ne * N_ELITE + ne;
+            if (ns >= NS)
+            {
+                continue;
+            }
+            if (loss[np*NS + ns] < min_loss)
+            {
+                min_loss = loss[np*NS + ns];
+                min_loss_ind = ns;
+            }
+        }
+        // copy the min loss to the bucket
+        top_k_loss[np*NS+ne] = min_loss;
+        top_k_loss_ind[np*NS+ne] = min_loss_ind;
+    }
+
+
     __global__
     void update_statistics(double* control, double* time, double* mean_control, double* mean_time, double* std_control, double* std_time,
         int* loss_ind, double* loss, int NP, int NS, int NT, int N_ELITE, double* best_ut){
@@ -265,9 +309,7 @@ namespace trajectory_optimizers{
         double sum_control = 0., sum_time = 0., ss_control = 0., ss_time = 0.;
         for(int i = 0; i < N_ELITE; i++){
             //printf("inside update_statistics. N_ELITE: %d\n", N_ELITE);
-
             //printf("inside update_statistics. elite_i: %d\n", i);
-
             unsigned int id = np * NS * NT + loss_ind[np * NS + i] * NT + nt;
             //printf("inside update_statistics. loss_ind: %d\n", loss_ind[np * NS + i]);
             //printf("inside update_statistics. id: %d\n", id);
@@ -281,12 +323,22 @@ namespace trajectory_optimizers{
         unsigned int s_id = np * NT + nt;
         mean_control[s_id] = sum_control / N_ELITE;
         mean_time[s_id] = sum_time / N_ELITE;
-        std_control[s_id] = sqrt(ss_control / N_ELITE - mean_control[s_id] * mean_control[s_id]);
+        double std_control_square = ss_control / N_ELITE - mean_control[s_id] * mean_control[s_id];
+        if (std_control_square < 1e-5)
+        {
+            std_control_square = 1e-5;
+        }
+        std_control[s_id] = sqrt(std_control_square);
 
         //printf("inside update_statistics. ss_time: %f\n", ss_time);
         //printf("inside update_statistics. ss_time/N_ELITE: %f\n", ss_time/N_ELITE);
 
-        std_time[s_id] = sqrt(ss_time / N_ELITE - mean_time[s_id] * mean_time[s_id]);
+        double std_time_square = ss_time / N_ELITE - mean_time[s_id] * mean_time[s_id];
+        if (std_time_square < 1e-5)
+        {
+            std_time_square = 1e-5;
+        }
+        std_time[s_id] = sqrt(std_time_square);
         
         //printf("inside update_statistics. ss_time: %f\n", ss_time);
         //printf("inside update_statistics. ss_time/N_ELITE: %f\n", ss_time/N_ELITE);
@@ -299,6 +351,9 @@ namespace trajectory_optimizers{
 
         best_ut[s_id] = control[np * NS * NT + loss_ind[np * NS] * NT + nt];
         best_ut[s_id + NP * NT] = time[np * NS * NT + loss_ind[np * NS] * NT + nt];
+        //printf("inside update_statistics. best_ut[s_id]: %f\n",  best_ut[s_id]);
+        //printf("inside update_statistics. best_ut[s_id+NP*NT]: %f\n",  best_ut[s_id + NP * NT]);
+
     }
     
 
@@ -366,14 +421,21 @@ namespace trajectory_optimizers{
         cudaMalloc(&d_std_time, NP * NT * sizeof(double));
         // for cem
         cudaMalloc(&d_loss, NP * NS * sizeof(double));
+
+        cudaMalloc(&d_top_k_loss, NP * NS * sizeof(double)); 
+
         cudaMalloc(&d_loss_ind, NP * NS * sizeof(int));
         loss_ind = (int*) malloc(NP * NS * sizeof(int));
         memset(loss_ind, 0, NP * NS  * sizeof(int));
         
+        loss = new double[NP*NS]();
+        loss_pair.resize(NS, std::make_pair(0., 0));
+
         // obstacles
         cudaMalloc(&d_obs_list, NOBS * 8 * sizeof(double));
         cudaMalloc(&d_active_mask, NP * NS * sizeof(bool));
 
+        
         
         obs_list = new double[NOBS*8]();
         for(unsigned i=0; i<_obs_list.size(); i++)
@@ -406,24 +468,44 @@ namespace trajectory_optimizers{
     void CEM_CUDA::solve(const double* start, const double* goal, double* best_u, double* best_t){
         // auto begin = std::chrono::system_clock::now();
         // start and goal should be NP * DIM_STATE
+
+        #ifdef PROFILE
+        auto profile_start = std::chrono::high_resolution_clock::now();
+        #endif
         cudaMemcpy(d_start_state, start, NP * DIM_STATE * sizeof(double), cudaMemcpyHostToDevice);
         cudaMemcpy(d_goal_state, goal, NP * DIM_STATE * sizeof(double), cudaMemcpyHostToDevice);
         //thrust::device_ptr<double> time_ptr(d_time);
         //thrust::device_ptr<double> control_ptr(d_control);
+        #ifdef PROFILE
 
-
+        auto profile_stop = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> profile_duration = profile_stop - profile_start; 
+        std::cout << "inside cem_cuda:solve. cudaMemcpy start & goal takes " << profile_duration.count() << "s" << std::endl; 
+        std::cout << "inside cem_cuda:solve. 1000 steps of cudaMemcpy start & goal takes " << 1000*profile_duration.count() << "s" << std::endl; 
+        #endif        
         dim3 grid(1, 1, 1);
         dim3 grid_s(1, NS, 1);
 
         dim3 block_pt(NP, 1, NT);
         dim3 block_p(NP, 1, 1);
 
-        thrust::device_ptr<double> loss_ptr(d_loss);
-        thrust::device_ptr<int> loss_ind_ptr(d_loss_ind);
+        //thrust::device_ptr<double> loss_ptr(d_loss);
+        //thrust::device_ptr<int> loss_ind_ptr(d_loss_ind);
         //init mean
         //printf("%f,%f,%f,%f\n", mu_t0, std_t0, mu_u0, std_u0);
+        #ifdef PROFILE
+
+        profile_start = std::chrono::high_resolution_clock::now();
+        #endif
+
         set_statistics<<<grid, block_pt>>>(d_mean_time, mu_t0, d_mean_control, mu_u0, d_std_control, std_u0, d_std_time, std_t0, NT);
 
+        #ifdef PROFILE
+        profile_stop = std::chrono::high_resolution_clock::now();
+        profile_duration = profile_stop - profile_start; 
+        std::cout << "inside cem_cuda:solve. set_statistics takes " << profile_duration.count() << "s" << std::endl; 
+        std::cout << "inside cem_cuda:solve. 1000 steps of set_statistics takes " << 1000*profile_duration.count() << "s" << std::endl; 
+        #endif
         // double min_loss = 1e5;
         // double tmp_min_loss = 2e5;
         // auto init_end = std::chrono::system_clock::now();
@@ -433,32 +515,158 @@ namespace trajectory_optimizers{
         for(unsigned int it = 0; it < it_max; it ++){
             //std::cout << "iteration: " << it << std::endl; 
             set_start_state<<<grid_s, block_p>>>(d_temp_state, d_start_state, NS);
+            #ifdef PROFILE
 
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
             sampling << <grid_s, block_pt >> > (d_control, d_time, d_mean_control, d_mean_time, d_std_control, d_std_time, max_duration, NP, NS, NT, d_active_mask, devState);
+            #ifdef PROFILE
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem_cuda:solve. sampling takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem_cuda:solve. 1000 steps of sampling takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
             //std::cout<< "start of propagation..." <<std::endl;
 
+
+            //std::cout<< "end of sorting." <<std::endl;
+            #ifdef PROFILE
+
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
             for(unsigned int t_step = 0; t_step < NT; t_step++){
                 propagate<<<grid_s, block_p >>>(d_temp_state, d_control, d_time, d_deriv, t_step, NS, NT, d_active_mask, d_obs_list);
             }
-            //std::cout<< "end of propagation." <<std::endl;
-            get_loss<<< grid_s, block_p >>>(d_temp_state, d_loss, NS, d_goal_state, d_active_mask);
-            //std::cout<< "start of sorting..." <<std::endl;
+            #ifdef PROFILE
 
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            //std::cout << "inside cem_cuda:solve. propagate takes " << profile_duration.count() << "s" << std::endl; 
+            //std::cout << "inside cem_cuda:solve. 1000 steps of propagate takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
+
+
+            //std::cout<< "end of propagation." <<std::endl;
+            #ifdef PROFILE
+
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
+            get_loss<<< grid_s, block_p >>>(d_temp_state, d_loss, NS, d_goal_state, d_active_mask);
+            
+            #ifdef PROFILE
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem_cuda:solve. get_loss takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem_cuda:solve. 1000 steps of get_loss takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
+            //std::cout<< "start of sorting..." <<std::endl;
+            
+            /**
+            //**  below method converts GPU to CPU, sorts in CPU, and then converts back
+            // copy gpu loss to cpu
+
+            #ifdef PROFILE
+
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
+            cudaMemcpy(loss, d_loss, NP * NS * sizeof(double), cudaMemcpyDeviceToHost);
+            #ifdef PROFILE
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem_cuda:solve. cudaMemcpy loss takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem_cuda:solve. 1000 steps of cudaMemcpy loss takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
             for (unsigned int p = 0; p < NP; p++) {
                 //std::cout<< "sorting... p=" << p <<std::endl;
+                // copy loss to std::vector of std::pair. For sorting
+                #ifdef PROFILE
+                profile_start = std::chrono::high_resolution_clock::now();
+                #endif
+                for (unsigned int si = 0; si < NS; si++)
+                {
+                    loss_pair[si].first = loss[p*NS+si];
+                    loss_pair[si].second = si;
+                }
 
-                thrust::sequence(loss_ind_ptr + NS * p, loss_ind_ptr + NS * p + NS);
+                sort(loss_pair.begin(), loss_pair.end());
+                // copy sorted value from CPU to GPU
+                for (unsigned int si = 0; si < NS; si++)
+                {
+                    loss[p*NS+si] = loss_pair[si].first;
+                    loss_ind[p*NS+si] = loss_pair[si].second;
+                }
+                #ifdef PROFILE
+                profile_stop = std::chrono::high_resolution_clock::now();
+                profile_duration = profile_stop - profile_start; 
+                std::cout << "inside cem_cuda:solve. sort takes " << profile_duration.count() << "s" << std::endl; 
+                std::cout << "inside cem_cuda:solve. 1000 steps of sort takes " << 1000*profile_duration.count() << "s" << std::endl; 
+                #endif
 
 
-                thrust::sort_by_key(loss_ptr + NS * p, loss_ptr + NS * p + NS, loss_ind_ptr + NS * p);
+                // profile_start = std::chrono::high_resolution_clock::now();
+                // thrust::sequence(loss_ind_ptr + NS * p, loss_ind_ptr + NS * p + NS);
 
 
+                // thrust::sort_by_key(loss_ptr + NS * p, loss_ptr + NS * p + NS, loss_ind_ptr + NS * p);
+                // profile_stop = std::chrono::high_resolution_clock::now();
+                // profile_duration = profile_stop - profile_start; 
+                // std::cout << "inside cem_cuda:solve. thrust calls takes " << profile_duration.count() << "s" << std::endl; 
+                // std::cout << "inside cem_cuda:solve. 1000 steps of thrust calls takes " << 1000*profile_duration.count() << "s" << std::endl; 
+        
             }
+            #ifdef PROFILE
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
+            // copy sorted value from CPU to GPU
+            cudaMemcpy(d_loss_ind, loss_ind, NP*NS*sizeof(int), cudaMemcpyHostToDevice);
+            cudaMemcpy(d_loss, loss, NP*NS*sizeof(double), cudaMemcpyHostToDevice);
+            #ifdef PROFILE
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem_cuda:solve. cudaMemcpy loss to device takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem_cuda:solve. 1000 steps of cudaMemcpy loss to device takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
+
+            */
+
+
+            //** Below uses approximate top-k method to bypass the memcpy overhead
+            #ifdef PROFILE
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
+
+            dim3 grid_topk(1, 1, 1);    
+            dim3 block_topk(NP, 1, N_ELITE);
+            get_approx_topk_loss <<< grid_topk, block_topk >>>(d_loss, NS, d_top_k_loss, d_loss_ind, N_ELITE);
+            #ifdef PROFILE
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem_cuda:solve. get_approx_topk_loss takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem_cuda:solve. 1000 steps of get_approx_topk_loss takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
+
+            //** End of approximate top-k
+
+
+
             //std::cout<< "end of sorting." <<std::endl;
+            #ifdef PROFILE
 
-
+            profile_start = std::chrono::high_resolution_clock::now();
+            #endif
             update_statistics<<<grid, block_pt >>>(d_control, d_time, d_mean_control, d_mean_time, d_std_control, d_std_time,
-                thrust::raw_pointer_cast(loss_ind_ptr),  thrust::raw_pointer_cast(loss_ptr), NP, NS, NT, N_ELITE, d_best_ut);
+                d_loss_ind,  d_loss, NP, NS, NT, N_ELITE, d_best_ut);
+            
+            #ifdef PROFILE
+            profile_stop = std::chrono::high_resolution_clock::now();
+            profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem_cuda:solve. update_statistics takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem_cuda:solve. 1000 steps of update_statistics takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
+
+            //update_statistics<<<grid, block_pt >>>(d_control, d_time, d_mean_control, d_mean_time, d_std_control, d_std_time,
+            //    thrust::raw_pointer_cast(loss_ind_ptr),  thrust::raw_pointer_cast(loss_ptr), NP, NS, NT, N_ELITE, d_best_ut);
+
             ////std::cout<< "update" <<std::endl;
             // for (unsigned int p = 0; p < NP; p++) {
             //     cudaMemcpy(&tmp_min_loss, thrust::raw_pointer_cast(loss_ptr + NS * p), sizeof(double), cudaMemcpyDeviceToHost);
@@ -481,8 +689,17 @@ namespace trajectory_optimizers{
     
 
         //std::cout << "copying from d_best_ut to best_u and best_t...\n" << std::endl;
+        #ifdef PROFILE
+        profile_start = std::chrono::high_resolution_clock::now();
+        #endif
         cudaMemcpy(best_u, d_best_ut, NP * NT * sizeof(double), cudaMemcpyDeviceToHost);
         cudaMemcpy(best_t, d_best_ut + NP * NT, NP * NT * sizeof(double), cudaMemcpyDeviceToHost);
+        #ifdef PROFILE
+        profile_stop = std::chrono::high_resolution_clock::now();
+        profile_duration = profile_stop - profile_start; 
+        std::cout << "inside cem_cuda:solve. cudaMemcpy of best_ut takes " << profile_duration.count() << "s" << std::endl; 
+        std::cout << "inside cem_cuda:solve. 1000 steps of cudaMemcpy of best_ut takes " << 1000*profile_duration.count() << "s" << std::endl; 
+        #endif
         //std::cout << "copied from d_best_ut to best_u and best_t.\n" << std::endl;
 
         //printf("control = [");

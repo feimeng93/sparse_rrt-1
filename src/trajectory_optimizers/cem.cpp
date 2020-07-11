@@ -1,4 +1,7 @@
 #include "trajectory_optimizers/cem.hpp"
+#include <chrono>
+
+// #define PROFILE
 
 // #define DEBUG
 #define OBS_PENALTY 1000
@@ -123,7 +126,20 @@ namespace trajectory_optimizers{
             }
             #endif
             //update statistics
+
+            #ifdef PROFILE
+            auto profile_start = std::chrono::high_resolution_clock::now();
+            #endif
             sort(loss.begin(), loss.end());
+
+            #ifdef PROFILE
+            auto profile_stop = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<float> profile_duration = profile_stop - profile_start; 
+            std::cout << "inside cem:solve. sort calls takes " << profile_duration.count() << "s" << std::endl; 
+            std::cout << "inside cem:solve. 1000 steps of sort calls takes " << 1000*profile_duration.count() << "s" << std::endl; 
+            #endif
+
+            
             #ifdef DEBUG
             for(unsigned int si = 0; si < number_of_samples; si++){
                 std::cout<< "si=" <<loss.at(si).first<< "\tid=" <<loss.at(si).second<<std::endl;
