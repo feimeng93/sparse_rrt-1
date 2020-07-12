@@ -101,8 +101,7 @@ public:
             system = new cart_pole_obs_t(obs_list, width);
             distance_computer = cart_pole_obs_t::distance;
         } else{
-            std::cout<<"undefined system"<<std::endl;
-            exit(-1);
+            throw std::runtime_error("undefined system");
         }
         // std::cout <<system_type<<std::endl;
         dt = integration_step;
@@ -130,7 +129,7 @@ public:
             );
         }
         else if (solver_type == "cem")
-         {
+        {
              cem.reset(
                  new trajectory_optimizers::CEM(
                      system, ns, nt,               
@@ -139,6 +138,8 @@ public:
                      mu_t, std_t, t_max, 
                      dt, loss_weights, max_it, verbose, step_size)
              );
+         } else {
+            throw std::runtime_error("unknown solver, support solvers: [\"cem_cuda\", \"cem\"]");
          }
 
        
@@ -151,7 +152,8 @@ public:
                     random_seed,
                     sst_delta_near, sst_delta_drain, 
                     cem.get(),
-                    mpnet.get()
+                    mpnet.get(),
+                    np
                     )
         );
     }
@@ -165,6 +167,7 @@ public:
         py::safe_array<double> terminal_array({system->get_state_dimension()*3}, return_states);
         return terminal_array;
     }
+    
     py::object deep_smp_step(bool refine, float refine_threshold, bool using_one_step_cost,
         bool cost_reselection, double goal_bias, int NP) {
         
@@ -199,6 +202,32 @@ public:
                 terminal_array_ref(pi, si, 2) = return_states[(pi*system->get_state_dimension()+si)*3+2];
             }
         }
+        delete return_states;
+        return terminal_array;
+    }
+
+    py::object deep_smp_step_batch(bool refine, float refine_threshold, bool using_one_step_cost,
+        bool cost_reselection, double goal_bias, int NP) {
+        
+        //std::cout << "vector to torch obs vector.." << std::endl;
+        double* return_states = new double[NP *system->get_state_dimension()*3]();
+       
+        planner -> deep_smp_step_batch(system, dt, obs_tensor, refine, refine_threshold, using_one_step_cost, cost_reselection, return_states, goal_bias, NP);
+        
+        py::safe_array<double> terminal_array({NP, (int) system->get_state_dimension(), 3});
+
+        //std::cout << "inside deep_smp_wrapper::neural_step_batch. before copying to terminal_array_ref" << std::endl;
+        auto terminal_array_ref = terminal_array.mutable_unchecked<3>();
+        for (unsigned pi = 0; pi < NP; pi ++)
+        {
+            for (unsigned si = 0; si < system->get_state_dimension(); si ++)
+            {
+                terminal_array_ref(pi, si, 0) = return_states[(pi*system->get_state_dimension()+si)*3];
+                terminal_array_ref(pi, si, 1) = return_states[(pi*system->get_state_dimension()+si)*3+1];
+                terminal_array_ref(pi, si, 2) = return_states[(pi*system->get_state_dimension()+si)*3+2];
+            }
+        }
+        
         delete return_states;
         return terminal_array;
     }
@@ -279,8 +308,6 @@ public:
 
     }
 
-
-
     py::object neural_sample(const py::safe_array<double> &state_array, bool refine, float refine_threshold, 
         bool using_one_step_cost, bool cost_reselection){
 
@@ -304,8 +331,6 @@ public:
         
             return neural_sample_state_array;
         }
-
-
 
     py::object neural_sample_batch(const py::safe_array<double> &state_array, bool refine, float refine_threshold, 
         bool using_one_step_cost, bool cost_reselection, const int NP){

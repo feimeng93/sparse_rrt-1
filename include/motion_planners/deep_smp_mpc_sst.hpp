@@ -68,7 +68,8 @@ public:
 		unsigned int random_seed,
 		double delta_near, double delta_drain,
 		trajectory_optimizers::CEM* cem,
-		networks::mpnet_cost_t *mpnet
+		networks::mpnet_cost_t *mpnet,
+		int np
 	);
 	virtual ~deep_smp_mpc_sst_t();
 
@@ -137,6 +138,9 @@ public:
 
 	
 	virtual void deep_smp_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
+    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, int NP);
+
+	virtual void deep_smp_step_batch(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
     	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, int NP);
 
 	
@@ -224,8 +228,9 @@ protected:
 	/**
 	 * 
 	 */
-	double* current_state;
-	int smp_counter;
+	double* shm_current_state;
+	int* shm_counter;
+	int NP;
 
 	// double* start_state;
 };

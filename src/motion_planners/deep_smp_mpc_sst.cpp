@@ -41,7 +41,8 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     unsigned int random_seed,
     double delta_near, double delta_drain,
     trajectory_optimizers::CEM* cem_ptr,
-    networks::mpnet_cost_t *mpnet_ptr
+    networks::mpnet_cost_t *mpnet_ptr,
+    int np
     ) 
     : planner_t(in_start, in_goal, in_radius,
                 a_state_bounds, a_control_bounds, a_distance_function, random_seed)
@@ -50,6 +51,7 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     , sst_delta_drain(delta_drain)
     , cem_ptr(cem_ptr)
     , mpnet_ptr(mpnet_ptr)
+    , NP(np)
 {
     //initialize the metrics
     unsigned int state_dimensions = this->get_state_dimension();
@@ -69,15 +71,18 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     samples.add_node(first_witness_sample);
     witness_nodes.push_back(first_witness_sample);
 
-    current_state = new double[state_dimensions]();
-    start_state = new double[state_dimensions]();
+    shm_current_state = new double[np * state_dimensions]();
+    shm_counter = new int[np]();
+    // start_state = new double[state_dimensions]();
+    for(int pi = 0; pi < np; pi++){
+        for(int si = 0; si < state_dimensions; si ++){
+            shm_current_state[si] = in_start[si];
+            // start_state[si] = in_start[si];
+        }
 
-    for(int si = 0; si < state_dimensions; si ++){
-        current_state[si] = in_start[si];
-        // start_state[si] = in_start[si];
+        shm_counter[pi] = 0;
     }
-
-    smp_counter = 0;
+    
 }
 
 deep_smp_mpc_sst_t::~deep_smp_mpc_sst_t() {
@@ -85,8 +90,8 @@ deep_smp_mpc_sst_t::~deep_smp_mpc_sst_t() {
     for (auto w: this->witness_nodes) {
         delete w;
     }
-
-    delete current_state;
+    delete shm_current_state;
+    delete shm_counter;
 }
 
 
@@ -559,9 +564,6 @@ void deep_smp_mpc_sst_t::steer_batch(enhanced_system_t* system, const double* st
     delete costs;
 }
 
-
-
-
 void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
     bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias)
 {
@@ -634,11 +636,11 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
             neural_sample_state[i] = goal_state[i];
         }
     } else {
-        neural_sample(system, current_state, neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection);
+        neural_sample(system, shm_current_state, neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection);
 
     }
     // sst_node_t* nearest = nearest_vertex(neural_sample_state);
-    sst_node_t* nearest = nearest_vertex(current_state);
+    sst_node_t* nearest = nearest_vertex(shm_current_state);
 
  
     // steer func
@@ -648,7 +650,7 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
 
     bool reset = true;
     if (system -> valid_state()){
-        smp_counter++;
+        shm_counter[0]++;
         double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);
         // std::cout<< duration << std::endl;
         // std::cout<<"duration:" << duration << std::endl;    
@@ -656,25 +658,23 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
         {
             add_to_tree(terminal_state, 0, nearest, duration);
             for(unsigned int si = 0; si < state_dimension; si++){
-                current_state[si] = terminal_state[si];
+                shm_current_state[si] = terminal_state[si];
                 reset = false;
             }
-
-            // if (this -> distance(current_state, goal_state, this->state_dimension) > 1.5 * goal_radius || smp_counter > 40){
-                
+            
+            // if (this -> distance(shm_current_state, goal_state, this->state_dimension) > 1.5 * goal_radius || smp_counter > 40){    
             //     sst_node_t* goal_nearest = nearest_vertex(goal_state);
             //     double duration = steer(system, goal_nearest->get_point(), goal_state, terminal_state, integration_step);
             //     if(duration > 0)
             //     {
             //         add_to_tree(terminal_state, 0, goal_nearest, duration);
             //     }
-
-
             //     for(int si = 0; si < this -> state_dimension; si ++){
-            //         current_state[si] = root->get_point()[si];
+            //         shm_current_state[si] = root->get_point()[si];
             //     }
-
             // }
+            
+            
         } 
     } 
   
@@ -685,24 +685,22 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
         states[i + state_dimension*2] = neural_sample_state[i];
     }
 
-    if(reset || smp_counter > 30) {
+    if(reset || shm_counter[0] > 30) {
         // for(int si = 0; si < this -> state_dimension; si ++){
-        //     current_state[si] = root -> get_point()[si];
-        //     // std::cout << current_state[si] << " ";
+        //     shm_current_state[si] = root -> get_point()[si];
+        //     // std::cout << shm_current_state[si] << " ";
         // }
         // // std::cout << std::endl;
         // smp_counter = 0;
         this->random_state(sample_state);
         nearest = nearest_vertex(sample_state);
         for(int si = 0; si < this -> state_dimension; si ++){
-            // current_state[si] = root -> get_point()[si];
-            // std::cout << current_state[si] << " ";
-            current_state[si] = nearest -> get_point()[si];
+            // shm_current_state[si] = root -> get_point()[si];
+            // std::cout << shm_current_state[si] << " ";
+            shm_current_state[si] = nearest -> get_point()[si];
         }
         // std::cout << std::endl;
-        smp_counter = 0;
-
-        
+        shm_counter[0] = 0;
     }
     delete sample_state;
     delete neural_sample_state;
@@ -725,17 +723,17 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
     double* neural_sample_state = new double[NP*this->state_dimension]();
     double* terminal_state = new double[this->state_dimension]();
     //  add neural sampling 
-    neural_sample_batch(system, current_state, neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection, NP);
+    neural_sample_batch(system, shm_current_state, neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection, NP);
     bool reset = true;
     sst_node_t* nearest;
     // smp_counter++;
-    nearest = nearest_vertex(current_state);
+    nearest = nearest_vertex(shm_current_state);
 
     for(int pi = 0; pi < NP; pi++){
         //  nearest = nearest_vertex(&neural_sample_state[pi * state_dimension]);
          for(unsigned int si = 0; si < state_dimension; si++){
             system->temp_state[si] = neural_sample_state[pi * state_dimension + si];
-            terminal_state[si] = current_state[si];
+            terminal_state[si] = shm_current_state[si];
         }
 
         if (system -> valid_state()){
@@ -745,7 +743,7 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
             {
                 add_to_tree(terminal_state, 0, nearest, duration);
                 for(unsigned int si = 0; si < state_dimension; si++){
-                    current_state[si] = terminal_state[si];
+                    shm_current_state[si] = terminal_state[si];
                 }
                 reset = false;
                 break;
@@ -767,9 +765,9 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
         this->random_state(sample_state);
         nearest = nearest_vertex(sample_state);
         for(int si = 0; si < this -> state_dimension; si ++){
-            // current_state[si] = root -> get_point()[si];
-            // std::cout << current_state[si] << " ";
-            current_state[si] = nearest -> get_point()[si];
+            // shm_current_state[si] = root -> get_point()[si];
+            // std::cout << shm_current_state[si] << " ";
+            shm_current_state[si] = nearest -> get_point()[si];
         }
         // std::cout << std::endl;
         // smp_counter = 0;
@@ -780,6 +778,91 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
     delete neural_sample_state;
     delete terminal_state;
     
+}
+
+
+void deep_smp_mpc_sst_t::deep_smp_step_batch(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
+    bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, int NP) {
+        /* Make prediction on current state
+     * Find nearest neighbor of the prediction in the tree
+     * Try to steer to that node
+     * Add the terminal node to the tree.
+     */
+    double* sample_state = new double[this->state_dimension]();
+    double* neural_sample_state = new double[NP * this->state_dimension]();
+    double* terminal_state = new double[NP * this->state_dimension]();
+    //  add neural sampling 
+    double* prob = new double[NP];
+    std::vector<sst_node_t*> nearest_list(NP, NULL);
+    bool* reset = new bool[NP]();
+    double* duration = new double[NP]();
+    double* steer_start_state =  new double[NP*this->state_dimension]();
+
+    neural_sample_batch(system, shm_current_state, neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection, NP);
+    for (int pi = 0; pi < NP; pi++){
+        reset[pi] = true;
+        prob[pi] = this->random_generator.uniform_random(0, 1);
+        if (prob[pi] < goal_bias){
+            for (unsigned int si = 0; si < state_dimension; si++){
+                neural_sample_state[pi * this->state_dimension + si] = goal_state[si];
+            }
+         }
+        // sst_node_t* nearest = nearest_vertex(neural_sample_state);
+        nearest_list[pi] = nearest_vertex(shm_current_state + pi * this->state_dimension);
+        // steer func
+        for(int si = 0; si < this->state_dimension; si++){
+            steer_start_state[pi * this->state_dimension + si] = nearest_list[pi]->get_point()[si];
+        }
+    } 
+    
+    steer_batch(system, steer_start_state, neural_sample_state, terminal_state, integration_step, NP, duration);
+
+    for (int pi = 0; pi < NP; pi++){
+        for(unsigned int si = 0; si < state_dimension; si++){
+            system->temp_state[si] = neural_sample_state[pi * this->state_dimension + si];
+        }
+        if (system -> valid_state()){
+            shm_counter[pi]++;
+            if(duration[pi] > 0)
+            {
+                add_to_tree(&terminal_state[pi * this->state_dimension], 0, nearest_list[pi], duration[pi]);
+                for(unsigned int si = 0; si < state_dimension; si++){
+                    shm_current_state[pi * this->state_dimension + si] = terminal_state[pi * this->state_dimension + si];
+                    reset[pi] = false;
+                }
+            } 
+        }
+        for(unsigned int si = 0; si < state_dimension; si++){
+            states[(pi * this->state_dimension + si) * 3] = nearest_list[pi]->get_point()[si];
+            states[(pi * this->state_dimension + si) * 3 + 1] = terminal_state[pi * this->state_dimension + si];
+            states[(pi * this->state_dimension + si) * 3 + 1] = neural_sample_state[pi * this->state_dimension + si];
+        }
+        if(reset || shm_counter[pi] > 30) {
+            // for(int si = 0; si < this -> state_dimension; si ++){
+            //     current_state[si] = root -> get_point()[si];
+            //     // std::cout << current_state[si] << " ";
+            // }
+            // // std::cout << std::endl;
+            // smp_counter = 0;
+            this->random_state(sample_state);
+            sst_node_t* nearest = nearest_vertex(sample_state);
+            for(int si = 0; si < this -> state_dimension; si ++){
+                // current_state[si] = root -> get_point()[si];
+                // std::cout << current_state[si] << " ";
+                shm_current_state[pi * this->state_dimension + si] = nearest -> get_point()[si];
+            }
+            // std::cout << std::endl;
+            shm_counter[pi] = 0;
+        }
+
+    }
+    delete sample_state;
+    delete neural_sample_state;
+    delete terminal_state;
+    delete prob;
+    delete reset;
+    delete duration;
+    delete steer_start_state;
 }
 
 

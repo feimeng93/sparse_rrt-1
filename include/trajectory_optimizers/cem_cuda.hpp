@@ -56,26 +56,31 @@ namespace trajectory_optimizers{
                     integration_step, loss_weights, max_iteration, verbose, step_size) */
                 
             ~CEM_CUDA(){
-                delete obs_list;
+                delete weight;
                 
-                delete temp_state;
-                delete loss_ind;
                 // delete best_ut;
-
+                cudaFree(d_best_ut);
                 cudaFree(d_temp_state);
-                cudaFree(d_control);
                 cudaFree(d_deriv);
+                cudaFree(d_control);
+
                 cudaFree(d_time);
                 cudaFree(d_mean_time);
                 cudaFree(d_mean_control);
                 cudaFree(d_std_control);
                 cudaFree(d_std_time);
+
                 cudaFree(d_loss);
                 cudaFree(d_top_k_loss);
 
                 cudaFree(d_loss_ind);
+                delete loss_ind;
+                delete loss;
+                delete obs_list;
+
                 cudaFree(d_obs_list);
                 cudaFree(d_active_mask);
+
                 cudaFree(d_start_state);
                 cudaFree(d_goal_state);
                 cudaFree(devState);
@@ -115,7 +120,7 @@ namespace trajectory_optimizers{
         protected:
             //enhanced_system_t *system;
             enhanced_system_t *system;
-            double *temp_state, *d_temp_state, *d_control, *d_deriv, *d_time;
+            double *d_temp_state, *d_control, *d_deriv, *d_time;
             double *d_mean_time, *d_mean_control, *d_std_control, *d_std_time;
             double *d_loss, *loss, *d_top_k_loss;
             int *d_loss_ind, *loss_ind;
