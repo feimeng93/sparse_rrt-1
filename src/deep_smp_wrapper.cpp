@@ -157,6 +157,12 @@ public:
                     )
         );
     }
+    ~DSSTMPCWrapper(){
+        delete system;
+        cem.reset();
+        mpnet.reset();
+        planner.reset();
+    }
 
     py::object neural_step(bool refine, float refine_threshold, bool using_one_step_cost,
         bool cost_reselection, double goal_bias) {
@@ -193,9 +199,9 @@ public:
 
         //std::cout << "inside deep_smp_wrapper::neural_step_batch. before copying to terminal_array_ref" << std::endl;
         auto terminal_array_ref = terminal_array.mutable_unchecked<3>();
-        for (unsigned pi = 0; pi < NP; pi ++)
+        for (unsigned pi = 0; pi < NP; pi++)
         {
-            for (unsigned si = 0; si < system->get_state_dimension(); si ++)
+            for (unsigned si = 0; si < system->get_state_dimension(); si++)
             {
                 terminal_array_ref(pi, si, 0) = return_states[(pi*system->get_state_dimension()+si)*3];
                 terminal_array_ref(pi, si, 1) = return_states[(pi*system->get_state_dimension()+si)*3+1];
@@ -218,9 +224,9 @@ public:
 
         //std::cout << "inside deep_smp_wrapper::neural_step_batch. before copying to terminal_array_ref" << std::endl;
         auto terminal_array_ref = terminal_array.mutable_unchecked<3>();
-        for (unsigned pi = 0; pi < NP; pi ++)
+        for (unsigned pi = 0; pi < NP; pi++)
         {
-            for (unsigned si = 0; si < system->get_state_dimension(); si ++)
+            for (unsigned si = 0; si < system->get_state_dimension(); si++)
             {
                 terminal_array_ref(pi, si, 0) = return_states[(pi*system->get_state_dimension()+si)*3];
                 terminal_array_ref(pi, si, 1) = return_states[(pi*system->get_state_dimension()+si)*3+1];
@@ -548,6 +554,14 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "goal_bias"_a=0
         )
         .def("deep_smp_step", &DSSTMPCWrapper::deep_smp_step,
+            "refine"_a, 
+            "refine_threshold"_a, 
+            "using_one_step_cost"_a,
+            "cost_reselection"_a,
+            "goal_bias"_a=0,
+            "NP"_a=1
+        )
+        .def("deep_smp_step_batch", &DSSTMPCWrapper::deep_smp_step_batch,
             "refine"_a, 
             "refine_threshold"_a, 
             "using_one_step_cost"_a,

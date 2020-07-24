@@ -212,12 +212,12 @@ namespace networks{
         double* normalized_state = new double[NP*system->get_state_dimension()];
         double* normalized_goal = new double[NP*system->get_state_dimension()];
         double* normalized_neural_sample_state = new double[NP*system->get_state_dimension()];
-        for (unsigned i=0; i<NP; i++)
+        for (unsigned i = 0; i < NP; i++)
         {
-            system -> normalize(state+i*system->get_state_dimension(), normalized_state+i*system->get_state_dimension());
+            system -> normalize(state+ i * system->get_state_dimension(), normalized_state + i * system->get_state_dimension());
 
             // only one goal
-            system -> normalize(goal_state, normalized_goal+i*system->get_state_dimension());
+            system -> normalize(goal_state, normalized_goal + i * system->get_state_dimension());
             //std::cout << "normalization... pi=" << i << std::endl;
             //std::cout << "before normalization, state = " << state[i*system->get_state_dimension()+0] << ", " << state[i*system->get_state_dimension()+1] << ", " << state[i*system->get_state_dimension()+2] << ", " << state[i*system->get_state_dimension()+3] << "]" << std::endl;
             //std::cout << "after normalization, state = " << normalized_state[i*system->get_state_dimension()+0] << ", " << normalized_state[i*system->get_state_dimension()+1] << ", " << normalized_state[i*system->get_state_dimension()+2] << ", " << normalized_state[i*system->get_state_dimension()+3] << "]" << std::endl;
@@ -247,10 +247,10 @@ namespace networks{
 
         torch::Tensor state_goal_tensor = at::cat({state_tensor_expand, goal_tensor_expand}, 1).to(torch::Device(device_id));
         // for multiple sampling
-        at::Tensor env_vox_tensor_expand = env_vox_tensor.repeat({NP, 1, 1, 1}).to(torch::Device(device_id));
+        torch::Tensor env_vox_tensor_expand = env_vox_tensor.repeat({NP, 1, 1, 1}).to(torch::Device(device_id));
         input_container.push_back(state_goal_tensor);
         input_container.push_back(env_vox_tensor_expand);
-        at::Tensor predicted_state_tensor = this -> forward(input_container).to(torch::Device(device_id));
+        torch::Tensor predicted_state_tensor = this -> forward(input_container).to(torch::Device(device_id));
         
 
         for (unsigned int pi = 0; pi < NP; pi++)
@@ -262,7 +262,6 @@ namespace networks{
             //std::cout << "denormalization... pi=" << pi << std::endl;
             //std::cout << "before denormalization, goal = " << normalized_neural_sample_state[pi*system->get_state_dimension()+0] << ", " << normalized_neural_sample_state[pi*system->get_state_dimension()+1] << ", " << normalized_neural_sample_state[pi*system->get_state_dimension()+2] << ", " << normalized_neural_sample_state[pi*system->get_state_dimension()+3] << "]" << std::endl;
             //std::cout << "after denormalization, goal = " << neural_sample_state[pi*system->get_state_dimension()+0] << ", " << neural_sample_state[pi*system->get_state_dimension()+1] << ", " << neural_sample_state[pi*system->get_state_dimension()+2] << ", " << neural_sample_state[pi*system->get_state_dimension()+3] << "]" << std::endl;
-
         }
         delete normalized_state;
         delete normalized_goal;

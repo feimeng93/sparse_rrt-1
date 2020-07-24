@@ -78,7 +78,6 @@ namespace trajectory_optimizers{
                 }
             }
             // propagation loops
-            // TODO: Parallization?
             for(unsigned int si = 0; si < number_of_samples; si++){ // reset loss
                 loss.at(si).first = 0; // loss: vector<double loss_value, int index>
                 loss.at(si).second = si;
