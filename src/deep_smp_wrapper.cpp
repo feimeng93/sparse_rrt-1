@@ -47,6 +47,7 @@ public:
             std::string mpnet_weight_path, std::string cost_predictor_weight_path,
             std::string cost_to_go_predictor_weight_path,
             int num_sample,
+            int shm_max_step,
             int np, int ns, int nt, int ne, int max_it,
             double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
             std::string device_id, float refine_lr, bool normalize,
@@ -55,44 +56,51 @@ public:
     ){
 
 
-        if(system_string.size()==0){
-            system_string="cartpole_obs";
-        }
         system_type = system_string;
         auto start_state = start_state_array.unchecked<1>();
         auto goal_state = goal_state_array.unchecked<1>();
-
-        if (obs_list_array.shape()[0] == 0) {
-             throw std::runtime_error("Should contain at least one obstacles.");
-         }
-         if (obs_list_array.shape()[1] != 2) {
-             throw std::runtime_error("Shape of the obstacle input should be (N,2).");
-         }
-         if (width <= 0.) {
-             throw std::runtime_error("obstacle width should be non-negative.");
-        }
         auto py_obs_list = obs_list_array.unchecked<2>();
-        // initialize the array
-        obs_list = std::vector<std::vector<double>>(obs_list_array.shape()[0], std::vector<double>(2, 0.0));
-        for (unsigned int i = 0; i < obs_list.size(); i++) {
-             obs_list[i][0] = py_obs_list(i, 0);
-             obs_list[i][1] = py_obs_list(i, 1);
-        }
-
-
         auto obs_voxel_data = obs_voxel_array.unchecked<1>();
         std::vector<float> obs_vec;
-        for (unsigned i = 0; i < obs_voxel_data.shape(0); i++)
-        {
-            obs_vec.push_back(float(obs_voxel_data(i)));
+        if (obs_list_array.shape()[0] == 0) {
+            throw std::runtime_error("Should contain at least one obstacles.");
         }
-        obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(torch::Device(device_id));
+        if (width <= 0.) {
+            throw std::runtime_error("obstacle width should be non-negative.");
+        }
 
+        if (system_type == "acrobot_obs" || system_type == "cartpole_obs"){
+            // Convert obs_pixels to tensor
+            
+            if (obs_list_array.shape()[1] != 2) {
+                throw std::runtime_error("Shape of the obstacle input should be (N,2).");
+            }
+            
+            // initialize the array
+            obs_list = std::vector<std::vector<double>>(obs_list_array.shape()[0], std::vector<double>(2, 0.0));
+            for (unsigned int i = 0; i < obs_list.size(); i++) {
+                obs_list[i][0] = py_obs_list(i, 0);
+                obs_list[i][1] = py_obs_list(i, 1);
+            }
+
+            for (unsigned i = 0; i < obs_voxel_data.shape(0); i++)
+            {
+                obs_vec.push_back(float(obs_voxel_data(i)));
+            }
+            obs_tensor = torch::from_blob(obs_vec.data(), {1, 1, 32, 32}).to(torch::Device(device_id));
+
+            
+        } else if (system_type == "quadrotor_obs") {
+            // Convert obs_voxels to tensors
+            obs_tensor = torch::zeros({1,1,32,32}).to(torch::Device(device_id));
+        } else {
+            throw std::runtime_error("undefined system");
+        }
         auto py_weight_array = weights_array.unchecked<1>();
         for (unsigned int i = 0; i < weights_array.shape()[0]; i++) {
-             loss_weights[i] = py_weight_array(i);
+            loss_weights[i] = py_weight_array(i);
         }
-
+       
         if (system_type == "acrobot_obs"){
             system = new two_link_acrobot_obs_t(obs_list, width);
             distance_computer = two_link_acrobot_obs_t::distance;
@@ -100,7 +108,11 @@ public:
         } else if (system_type == "cartpole_obs"){
             system = new cart_pole_obs_t(obs_list, width);
             distance_computer = cart_pole_obs_t::distance;
-        } else{
+
+        } else if (system_type == "quadrotor_obs") {
+            system = new quadrotor_obs_t();
+            distance_computer = quadrotor_obs_t::distance;
+        } else {
             throw std::runtime_error("undefined system");
         }
         // std::cout <<system_type<<std::endl;
@@ -113,12 +125,10 @@ public:
             num_sample, device_id, refine_lr, normalize)
             //  new networks::mpnet_t(mpnet_weight_path)
         );
-        std::cout <<""<<std::endl;
 
 
         if (solver_type == "cem_cuda")
         {
-            
             cem.reset(
                 new trajectory_optimizers::CEM_CUDA(
                     system, np, ns, nt,               
@@ -153,7 +163,8 @@ public:
                     sst_delta_near, sst_delta_drain, 
                     cem.get(),
                     mpnet.get(),
-                    np
+                    np,
+                    shm_max_step
                     )
         );
     }
@@ -482,6 +493,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             std::string, std::string, 
             std::string, 
             int,
+            int,
             int, int, int, int, int,
             double, double, double, double, double, double, double, double,
             std::string, float, bool,
@@ -491,18 +503,19 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "solver_type"_a="cem",
             "start_state"_a,
             "goal_state"_a,
-            "goal_radius"_a,
+            "goal_radius"_a=10,
             "random_seed"_a=0,
-            "sst_delta_near"_a,
-            "sst_delta_drain"_a,
+            "sst_delta_near"_a=0.1,
+            "sst_delta_drain"_a=0.1,
             "obs_list"_a=py::safe_array<double>(),
             "width"_a=0,
             "verbose"_a=false,
             "mpnet_weight_path"_a="", "cost_predictor_weight_path"_a="",
             "cost_to_go_predictor_weight_path"_a="",
             "num_sample"_a=1,
-            "np"_a=1, "ns"_a, "nt"_a, "ne"_a, "max_it"_a,
-            "converge_r"_a, "mu_u"_a, "std_u"_a, "mu_t"_a, "std_t"_a, "t_max"_a, "step_size"_a, "integration_step"_a,
+            "shm_max_step"_a=30,
+            "np"_a=1, "ns"_a=32, "nt"_a=1, "ne"_a=4, "max_it"_a=10,
+            "converge_r"_a=0.1, "mu_u"_a=0, "std_u"_a=0, "mu_t"_a=0, "std_t"_a=0, "t_max"_a=0, "step_size"_a=1, "integration_step"_a=2e-2,
             "device_id"_a="cuda:0", "refine_lr"_a=0.2, "normalize"_a=true,
             "weights_array"_a=py::safe_array<double>(),
             "obs_voxel_array"_a=py::safe_array<double>()

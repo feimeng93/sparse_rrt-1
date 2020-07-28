@@ -9,7 +9,7 @@
             // Resolved by CMake Tools:
             // "program": "${command:cmake.launchTargetPath}",
             // "program": "${workspaceFolder}/bin/test_mpc",
-            "program": "${workspaceFolder}/bin/test_deep_smp_mpc_sst",
+            "program": "${workspaceFolder}/bin/test_quadrotor",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",

@@ -4,14 +4,9 @@
 #include <string>
 
 namespace networks{
-    mpnet_t::mpnet_t(std::string network_weights_path) : network_t(network_weights_path){
-        if(network_weights_path.length() != 0){
-            network_torch_module_ptr.reset(new torch::jit::script::Module(
-                torch::jit::load(network_weights_path)));
-        } else {
-            network_torch_module_ptr.reset(new torch::jit::script::Module(
-                torch::jit::load("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt")));
-        }
+    mpnet_t::mpnet_t(std::string network_weights_path, std::string device_id){
+        load_weights(network_weights_path, this->network_torch_module_ptr, device_id);            
+
     }
 
     mpnet_t::~mpnet_t(){

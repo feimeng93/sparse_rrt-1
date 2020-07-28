@@ -30,7 +30,7 @@
 // #define DEBUG
 // #define DEBUG_MPNET
 // #define DEBUG_CEM
-// #define PRINT_GOAL
+#define PRINT_GOAL
 
 deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     const double* in_start, const double* in_goal,
@@ -42,7 +42,8 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     double delta_near, double delta_drain,
     trajectory_optimizers::CEM* cem_ptr,
     networks::mpnet_cost_t *mpnet_ptr,
-    int np
+    int np, 
+    int shm_max_step
     ) 
     : planner_t(in_start, in_goal, in_radius,
                 a_state_bounds, a_control_bounds, a_distance_function, random_seed)
@@ -52,6 +53,7 @@ deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     , cem_ptr(cem_ptr)
     , mpnet_ptr(mpnet_ptr)
     , NP(np)
+    , shm_max_step(shm_max_step)
 {
     //initialize the metrics
     unsigned int state_dimensions = this->get_state_dimension();
@@ -684,7 +686,7 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
         states[i + state_dimension*2] = neural_sample_state[i];
     }
 
-    if(reset || shm_counter[0] > 30) {
+    if(reset || shm_counter[0] > shm_max_step) {
         // for(int si = 0; si < this -> state_dimension; si ++){
         //     shm_current_state[si] = root -> get_point()[si];
         //     // std::cout << shm_current_state[si] << " ";

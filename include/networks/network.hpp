@@ -9,13 +9,19 @@ namespace networks{
     class network_t
     {
     public:
-        network_t(std::string network_weights_path){
+        network_t(){}
+        network_t(std::string network_weights_path, std::string device_id){
             // initialize network
+            load_weights(network_weights_path, this->network_torch_module_ptr, device_id);            
+        }
+        void load_weights(std::string network_weights_path, std::shared_ptr<torch::jit::script::Module> &ptr, std::string device_id){
             if(network_weights_path == ""){
-                std::cout <<"empty network_wieght_path, using default" << std::endl;
+                std::cout <<"Warning: Empty network_wieght_path, skipping model loading" << std::endl;
+            } else{
+                ptr.reset(new torch::jit::script::Module(
+                    torch::jit::load(network_weights_path)));
+                ptr -> to(torch::Device(device_id));
             }
-            network_torch_module_ptr.reset(new torch::jit::script::Module(
-                torch::jit::load(network_weights_path)));
         }
 
         virtual ~network_t(){

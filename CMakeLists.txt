@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(INCLUDE_DIRECTORIES include)
 
 add_definitions(-O3)
-#SET(CMAKE_BUILD_TYPE "Debug")
+# SET(CMAKE_BUILD_TYPE "Debug")
 #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 #SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
@@ -66,6 +66,7 @@ include_directories(
 
 set(PLANNING_UTILS
     src/nearest_neighbors/graph_nearest_neighbors.cpp
+
     src/utilities/timer.cpp
     src/utilities/random.cpp
     src/image_creation/svg_image.cpp
@@ -85,7 +86,6 @@ set(SOURCE_FILES
     src/systems/point.cpp
     src/systems/rally_car.cpp
     src/systems/two_link_acrobot.cpp
-    src/systems/quadrotor_obs.cpp
     #src/utilities/random.cpp
     #src/utilities/timer.cpp
     #src/image_creation/svg_image.cpp
@@ -168,24 +168,43 @@ set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
 
 
 # for all test
+### test trajectory optimizers MPC
 add_executable(
     test_mpc
-    src/tests/test_mpc.cpp
+    src/tests/trajectory_optimizers/test_mpc.cpp
     ${MPC_SOURCE}
     )
 target_link_libraries(test_mpc CEMMPC)
 
-add_executable(test_deep_smp_mpc_sst
-    src/tests/test_deep_smp_mpc_sst.cpp
+
+### test planners
+add_executable(test_planner
+    src/tests/motion_planners/test_planner.cpp
     ${DEEP_SMP_MODULE}
     )
-
 target_link_libraries(
-    test_deep_smp_mpc_sst   
+    test_planner   
     ${TORCH_LIBRARIES}
     CEMMPC
     )
+set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
 
-set_property(TARGET test_deep_smp_mpc_sst PROPERTY CXX_STANDARD 14)
+### test quadrotor system
+add_executable(test_quadrotor
+    src/systems/quadrotor_obs.cpp
+    src/tests/systems/test_quadrotor.cpp
+    )
+
+add_executable(test_planner_quadrotor
+    src/systems/quadrotor_obs.cpp
+    src/tests/motion_planners/test_planner_quadrotor.cpp
+    ${DEEP_SMP_MODULE}
+    )
+target_link_libraries(
+    test_planner_quadrotor   
+    ${TORCH_LIBRARIES}
+    CEMMPC
+    )
+set_property(TARGET test_planner_quadrotor PROPERTY CXX_STANDARD 14)
 
 

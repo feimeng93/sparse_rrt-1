@@ -5,32 +5,17 @@
 
 // #define DEBUG
 namespace networks{
-    mpnet_cost_t::mpnet_cost_t(std::string network_weights_path, 
+    mpnet_cost_t::mpnet_cost_t(
+        std::string network_weights_path, 
         std::string cost_predictor_weights_path,
         std::string cost_to_go_predictor_weights_path, 
-        int num_sample, std::string device_id, float refine_lr, bool normalize) : mpnet_t(network_weights_path),
+        int num_sample, std::string device_id, float refine_lr, bool normalize) :
         num_sample(num_sample), device_id(device_id), refine_lr(refine_lr), normalize(normalize)
         {
-            if (network_weights_path.length() > 0) {
-                network_torch_module_ptr.reset(new torch::jit::script::Module(
-                    torch::jit::load(network_weights_path)));
-            }
-           
-            if (cost_predictor_weights_path.length() > 0) {
-                 cost_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
-                    torch::jit::load(cost_predictor_weights_path)));
-                network_torch_module_ptr->to(torch::Device(device_id));
-                cost_predictor_torch_module_ptr->to(torch::Device(device_id));
-            }
-           
-            
-            if (cost_to_go_predictor_weights_path.length() > 0) {
-                cost_to_go_predictor_torch_module_ptr.reset(new torch::jit::script::Module(
-                    torch::jit::load(cost_to_go_predictor_weights_path)));
-                cost_to_go_predictor_torch_module_ptr->to(torch::Device(device_id));
-            }
-            
-    }
+            load_weights(network_weights_path, this->network_torch_module_ptr, device_id);            
+            load_weights(cost_predictor_weights_path, this->cost_predictor_torch_module_ptr, device_id);            
+            load_weights(cost_to_go_predictor_weights_path, this->cost_to_go_predictor_torch_module_ptr, device_id);
+        }
 
     mpnet_cost_t::~mpnet_cost_t(){
         network_torch_module_ptr.reset();

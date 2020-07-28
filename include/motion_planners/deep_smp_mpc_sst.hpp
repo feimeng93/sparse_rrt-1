@@ -69,7 +69,8 @@ public:
 		double delta_near, double delta_drain,
 		trajectory_optimizers::CEM* cem,
 		networks::mpnet_cost_t *mpnet,
-		int np
+		int np,
+		int shm_max_step
 	);
 	virtual ~deep_smp_mpc_sst_t();
 
@@ -230,6 +231,8 @@ protected:
 	 */
 	double* shm_current_state;
 	int* shm_counter;
+	int shm_max_step;
+
 	int NP;
 
 	// double* start_state;

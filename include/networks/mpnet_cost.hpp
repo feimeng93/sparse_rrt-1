@@ -8,13 +8,14 @@ namespace networks{
     class mpnet_cost_t : public mpnet_t
     {
     public:
+        mpnet_cost_t() : mpnet_t() {}
         mpnet_cost_t(std::string network_weights_path,
-            std::string cost_predictor_weights_path,
-            std::string cost_to_go_predictor_weights_path,
-            int num_sample, 
-            std::string device_id,
-            float refine_lr,
-            bool normalize);
+                     std::string cost_predictor_weights_path,
+                     std::string cost_to_go_predictor_weights_path,
+                     int num_sample, 
+                     std::string device_id,
+                     float refine_lr,
+                     bool normalize);
         at::Tensor forward(std::vector<torch::jit::IValue> input_container);
         at::Tensor forward_cost(std::vector<torch::jit::IValue> input_container);
         at::Tensor forward_cost_to_go(std::vector<torch::jit::IValue> input_container);
