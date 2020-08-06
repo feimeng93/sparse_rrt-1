@@ -12,8 +12,11 @@
 using namespace std;
 
 int main(){
-    enhanced_system_t* model = new quadrotor_obs_t();
-    
+    double width = 1;
+    std::vector<std::vector<double>> obs_list;
+    obs_list.push_back(std::vector<double> {4., 4., 4.});
+    enhanced_system_t* model = new quadrotor_obs_t(obs_list, width);
+
     // initialize cem
     double loss_weights[13] = {1, 1, 1, 
                                0.3, 0.3, 0.3, 0.3,
@@ -24,12 +27,12 @@ int main(){
         ne = 32,
         max_it = 20;
     double converge_r = 0.1,
-           mu_u = 0,
-           std_u = 4,
+           *mu_u = new double[4]{0, 0, 0, 0},
+           *std_u = new double[4]{15, 1, 1, 1},
            mu_t = 0.1,
            std_t = 0.2,
            t_max = 0.5,
-           dt = 2e-2,
+           dt = 2e-3,
            step_size = 0.5;
     trajectory_optimizers::CEM cem(model, ns, nt,               
                     ne, converge_r, 
@@ -46,18 +49,18 @@ int main(){
     deep_smp_mpc_sst_t* planner;
 
     const double in_start[13] = {0, 0, 0, 
-                                 0, 0, 0, 0,
+                                 0, 0, 0, 1,
                                  0, 0, 0,
                                  0, 0, 0,
                           };
-    double in_goal[13] = {0, 0, 4, 
-                          0, 0, 0, 0,
+    double in_goal[13] = {0, 0, 2, 
+                          0, 0, 0, 1,
                           0, 0, 0,
                           0, 0, 0,
                           };;
     double in_radius = 3; 
 
-    torch::Tensor obs = torch::zeros({1,1,32,32}).to(at::kCUDA);
+    torch::Tensor obs = torch::zeros({1,32,32,32}).to(at::kCUDA);
     torch::NoGradGuard no_grad;
 
     planner = new deep_smp_mpc_sst_t(
@@ -67,7 +70,7 @@ int main(){
         model->get_control_bounds(),
         quadrotor_obs_t::distance,
         0,
-        0.0001, 0.00005,
+        0.3, 0.3,
         &cem,
         &mpnet, 1, 1);
 
@@ -88,8 +91,22 @@ int main(){
     // std::cout<<std::endl;
 
     // Test step function
-    for(int i = 0; i < 600000; i++){
-        planner -> step(model, 10, 4000, dt);
+    for(int i = 0; i < 300000; i++){
+        planner -> step(model, 1, 200, dt);
+        if(i % 1000 == 1){
+            std::vector<std::vector<double>> solution_path;
+            std::vector<std::vector<double>> controls;
+            std::vector<double> costs;
+            planner->get_solution(solution_path, controls, costs);
+            std::cout << i <<"-th iteration, ";
+            if (controls.size() > 0) {
+                std::copy(costs.begin(), costs.end(), std::ostream_iterator<double>(std::cout, " "));
+                std::cout<<", cost:"<< accumulate(costs.begin(), costs.end(), 0.0)<<std::endl;
+            } else {
+                std::cout<<std::endl;
+            }
+
+        }        
     }
     // const double start[4] = {-0.42044061,  0.96072684, -0.84960626,  2.32958837};
     // const double goal[4] = {-0.48999742,  1.20535017, -0.02984635,  0.98378645};

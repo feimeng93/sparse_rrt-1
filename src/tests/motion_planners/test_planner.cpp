@@ -1,5 +1,4 @@
 #include "trajectory_optimizers/cem.hpp"
-#include "trajectory_optimizers/cem_config.hpp"
 
 #include "systems/two_link_acrobot_obs.hpp"
 #include "systems/quadrotor_obs.hpp"
@@ -32,8 +31,8 @@ int main(){
         ne = 32,
         max_it = 20;
     double converge_r = 0.1,
-        mu_u = 0,
-        std_u = 4,
+        *mu_u = new double[1]{0},
+        *std_u = new double[1]{4},
         mu_t = 0.1,
         std_t = 0.2,
         t_max = 0.5,
@@ -73,6 +72,8 @@ int main(){
         &cem,
         &mpnet, 1, 1);
     planner -> step(model, 10, 50, dt);
+
+
     // const double start[4] = {-0.42044061,  0.96072684, -0.84960626,  2.32958837};
     // const double goal[4] = {-0.48999742,  1.20535017, -0.02984635,  0.98378645};
     // double * terminal = new double[model->get_state_dimension()];

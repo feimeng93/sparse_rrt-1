@@ -14,15 +14,20 @@ namespace trajectory_optimizers{
         public:
             CEM(enhanced_system_t* model, unsigned int number_of_samples, unsigned int number_of_t,
                 unsigned int number_of_elite, double converge_r, 
-                double control_means, double control_stds, 
+                double* control_means, double* control_stds, 
                 double time_means, double time_stds, double max_duration,
                 double integration_step, double* loss_weights, unsigned int max_iteration, bool verbose, double step_size){
                     system = model;
                     this -> number_of_samples = number_of_samples;
                     this -> number_of_t = number_of_t;
                     this -> number_of_elite = number_of_elite;
-                    mu_u0 = control_means;
-                    std_u0 = control_stds;
+                    mu_u0 = new double[system -> get_control_dimension()]();
+                    std_u0 = new double[system -> get_control_dimension()]();
+                    for(unsigned int ui = 0; ui < system -> get_control_dimension(); ui++){
+                        mu_u0[ui] = control_means[ui];
+                        std_u0[ui] = control_stds[ui];
+                    }
+                    
                     mu_t0 = time_means;
                     std_t0 = time_stds;
                     this -> max_duration = max_duration;
@@ -57,6 +62,8 @@ namespace trajectory_optimizers{
 
             }
             ~CEM(){
+                delete mu_u0;
+                delete std_u0;
                 delete mu_u;
                 delete std_u;
                 delete mu_t;
@@ -94,7 +101,7 @@ namespace trajectory_optimizers{
                 *current_state/* dim_state */;
             bool *active_mask/* ns */;
             double *mu_u/* nt * dim_control */, *std_u /* nt * dim_control */, *mu_t/* nt */, *std_t/* nt */;  
-            double mu_u0, std_u0, mu_t0, std_t0, max_duration;
+            double *mu_u0, *std_u0, mu_t0, std_t0, max_duration;
             std::vector<std::pair<double, int>> loss;
             std::default_random_engine generator;
             bool verbose;

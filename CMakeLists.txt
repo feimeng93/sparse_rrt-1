@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(INCLUDE_DIRECTORIES include)
 
 add_definitions(-O3)
-# SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_BUILD_TYPE "Debug")
 #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 #SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
@@ -90,6 +90,7 @@ set(SOURCE_FILES
     #src/utilities/timer.cpp
     #src/image_creation/svg_image.cpp
     #src/image_creation/planner_visualization.cpp
+    src/systems/quadrotor.cpp
     src/systems/distance_functions.cpp
     ${PLANNING_UTILS}
 )
@@ -117,7 +118,8 @@ set(MPC_SOURCE
     src/systems/two_link_acrobot_obs.cpp
     src/systems/quadrotor_obs.cpp
     src/trajectory_optimizers/cem.cpp
-    src/trajectory_optimizers/cem_cuda.cu)
+    # src/trajectory_optimizers/cem_cuda.cu
+    )
 
 # set_property(TARGET CEMMPC PROPERTY CXX_STANDARD 11)
 

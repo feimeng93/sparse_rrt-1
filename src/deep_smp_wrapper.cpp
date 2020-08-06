@@ -8,12 +8,14 @@
 #include "systems/quadrotor_obs.hpp"
 
 #include "trajectory_optimizers/cem.hpp"
-#include "trajectory_optimizers/cem_cuda.hpp"
+// #include "trajectory_optimizers/cem_cuda.hpp"
 
 #include "networks/mpnet.hpp"
 #include "networks/mpnet_cost.hpp"
 
 #include "motion_planners/deep_smp_mpc_sst.hpp"
+
+#include "cstdio"
 
 namespace pybind11 {
     template <typename T>
@@ -49,13 +51,11 @@ public:
             int num_sample,
             int shm_max_step,
             int np, int ns, int nt, int ne, int max_it,
-            double converge_r, double mu_u, double std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
+            double converge_r, const py::safe_array<double> mu_u, const py::safe_array<double> std_u, double mu_t, double std_t, double t_max, double step_size, double integration_step,
             std::string device_id, float refine_lr, bool normalize,
             py::safe_array<double>& weights_array,
             py::safe_array<double>& obs_voxel_array
     ){
-
-
         system_type = system_string;
         auto start_state = start_state_array.unchecked<1>();
         auto goal_state = goal_state_array.unchecked<1>();
@@ -91,15 +91,28 @@ public:
 
             
         } else if (system_type == "quadrotor_obs") {
+            if (obs_list_array.shape()[1] != 3) {
+                throw std::runtime_error("Shape of the obstacle input should be (N,3).");
+            }
             // Convert obs_voxels to tensors
-            obs_tensor = torch::zeros({1,1,32,32}).to(torch::Device(device_id));
+            // printf("%d, %d", obs_list_array.shape()[0], obs_list_array.shape()[1]);
+            obs_list = std::vector<std::vector<double>>(obs_list_array.shape()[0], std::vector<double>(3, 0.0));
+            for (unsigned int i = 0; i < obs_list.size(); i++) {
+                obs_list[i][0] = py_obs_list(i, 0);
+                obs_list[i][1] = py_obs_list(i, 1);
+                obs_list[i][2] = py_obs_list(i, 2);
+                // printf("%f, %f, %f\n", obs_list[i][0], obs_list[i][1], obs_list[i][2]);
+            }
+            
+            // TODO: pass from para
+            // for (unsigned i = 0; i < obs_voxel_data.shape(0); i++)
+            // {
+            //     obs_vec.push_back(float(obs_voxel_data(i)));
+            // }
+            obs_tensor = torch::zeros({1,32,32,32}).to(torch::Device(device_id));
         } else {
             throw std::runtime_error("undefined system");
-        }
-        auto py_weight_array = weights_array.unchecked<1>();
-        for (unsigned int i = 0; i < weights_array.shape()[0]; i++) {
-            loss_weights[i] = py_weight_array(i);
-        }
+        }      
        
         if (system_type == "acrobot_obs"){
             system = new two_link_acrobot_obs_t(obs_list, width);
@@ -110,14 +123,25 @@ public:
             distance_computer = cart_pole_obs_t::distance;
 
         } else if (system_type == "quadrotor_obs") {
-            system = new quadrotor_obs_t();
+            system = new quadrotor_obs_t(obs_list, width);
             distance_computer = quadrotor_obs_t::distance;
         } else {
             throw std::runtime_error("undefined system");
         }
         // std::cout <<system_type<<std::endl;
         dt = integration_step;
-        
+
+        auto py_weight_array = weights_array.unchecked<1>();
+        loss_weights = new double[system->get_state_dimension()]();
+        if(weights_array.shape()[0] > 0){
+            for (unsigned int i = 0; i < weights_array.shape()[0]; i++) {
+                loss_weights[i] = py_weight_array(i);
+            }
+        } else {
+            for (unsigned int i = 0; i < system->get_state_dimension(); i++){
+                loss_weights[i] = 1;
+            }
+        }
         mpnet.reset(
             new networks::mpnet_cost_t(mpnet_weight_path, 
             cost_predictor_weight_path, 
@@ -125,33 +149,44 @@ public:
             num_sample, device_id, refine_lr, normalize)
             //  new networks::mpnet_t(mpnet_weight_path)
         );
+        // std::cout <<"network"<<std::endl;
 
+        double *mean_control = new double[system->get_control_dimension()]();
+        double *std_control = new double[system->get_control_dimension()]();
+        auto mean_control_ref = mu_u.unchecked<1>();
+        auto std_control_ref = std_u.unchecked<1>();
 
+        for(unsigned int ui = 0; ui < system->get_control_dimension(); ui++){
+            mean_control[ui] = mean_control_ref[ui];
+            std_control[ui] = std_control_ref[ui];
+        }
         if (solver_type == "cem_cuda")
         {
-            cem.reset(
-                new trajectory_optimizers::CEM_CUDA(
-                    system, np, ns, nt,               
-                    ne, converge_r, obs_list, 
-                    mu_u, std_u, 
-                    mu_t, std_t, t_max, 
-                    dt, loss_weights, max_it, verbose, step_size)
-            );
+            throw std::runtime_error("bugs to be solved");
+            // cem.reset(
+            //     new trajectory_optimizers::CEM_CUDA(
+            //         system, np, ns, nt,               
+            //         ne, converge_r, obs_list, 
+            //         mean_control, std_control, 
+            //         mu_t, std_t, t_max, 
+            //         dt, loss_weights, max_it, verbose, step_size)
+            // );
         }
+        
         else if (solver_type == "cem")
         {
              cem.reset(
                  new trajectory_optimizers::CEM(
                      system, ns, nt,               
                      ne, converge_r, 
-                     mu_u, std_u, 
+                     mean_control, std_control, 
                      mu_t, std_t, t_max, 
                      dt, loss_weights, max_it, verbose, step_size)
              );
          } else {
             throw std::runtime_error("unknown solver, support solvers: [\"cem_cuda\", \"cem\"]");
          }
-
+        // std::cout <<"cem"<<std::endl;
        
         planner.reset(
             new deep_smp_mpc_sst_t(
@@ -167,6 +202,9 @@ public:
                     shm_max_step
                     )
         );
+
+        delete mean_control;
+        delete std_control;
     }
     ~DSSTMPCWrapper(){
         delete system;
@@ -260,7 +298,7 @@ public:
         planner->mpc_step(system, integration_step);
     }
 
-    py::object steer(const py::safe_array<double> &start_array,
+   py::object steer(const py::safe_array<double> &start_array,
                      const py::safe_array<double> &sample_array){
 
         auto start_state_ref = start_array.unchecked<1>();
@@ -285,6 +323,33 @@ public:
         return terminal_array;
 
     }
+
+    py::object steer_sst(int min_time_steps, int max_time_steps, double integration_step){
+
+
+        double* steer_start = new double[system->get_state_dimension()]();
+        double* steer_end = new double[system->get_state_dimension()]();
+
+        planner->step_with_output(system, min_time_steps, max_time_steps, integration_step, steer_start, steer_end);
+
+        py::safe_array<double> py_steer_start({system->get_state_dimension()}, steer_start);
+        py::safe_array<double> py_steer_end({system->get_state_dimension()}, steer_end);
+        auto py_steer_start_ref = py_steer_start.mutable_unchecked<1>();
+        auto py_steer_end_ref = py_steer_end.mutable_unchecked<1>();
+        
+        for (unsigned i=0; i<system->get_state_dimension(); i++)
+        {
+             py_steer_start_ref(i) = steer_start[i];
+             py_steer_end_ref(i) = steer_end[i];
+        }
+
+        delete steer_start;
+        delete steer_end;
+        return py::cast(std::tuple<py::safe_array<double>, py::safe_array<double>>
+            (py_steer_start, py_steer_end));
+    }
+
+
     py::object steer_batch(const py::safe_array<double> &start_array,
                      const py::safe_array<double> &sample_array, const int NP){
 
@@ -463,7 +528,7 @@ protected:
     sst_node_t* nearest;
     std::vector<std::vector<double>> obs_list;
     double dt;
-    double* loss_weights = new double[4]();
+    double* loss_weights;
     torch::Tensor obs_tensor;
     torch::NoGradGuard no_grad;
 
@@ -495,7 +560,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             int,
             int,
             int, int, int, int, int,
-            double, double, double, double, double, double, double, double,
+            double, const py::safe_array<double>, const py::safe_array<double>, double, double, double, double, double,
             std::string, float, bool,
             py::safe_array<double>&,
             py::safe_array<double>&>(),
@@ -515,7 +580,7 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "num_sample"_a=1,
             "shm_max_step"_a=30,
             "np"_a=1, "ns"_a=32, "nt"_a=1, "ne"_a=4, "max_it"_a=10,
-            "converge_r"_a=0.1, "mu_u"_a=0, "std_u"_a=0, "mu_t"_a=0, "std_t"_a=0, "t_max"_a=0, "step_size"_a=1, "integration_step"_a=2e-2,
+            "converge_r"_a=0.1, "mu_u"_a=py::safe_array<double>({0}), "std_u"_a=py::safe_array<double>({0}), "mu_t"_a=0, "std_t"_a=0, "t_max"_a=0, "step_size"_a=1, "integration_step"_a=2e-2,
             "device_id"_a="cuda:0", "refine_lr"_a=0.2, "normalize"_a=true,
             "weights_array"_a=py::safe_array<double>(),
             "obs_voxel_array"_a=py::safe_array<double>()
@@ -524,6 +589,11 @@ PYBIND11_MODULE(_deep_smp_module, m) {
             "start_array"_a,
              "sample_array"_a
         )
+         .def("steer_sst", &DSSTMPCWrapper::steer_sst,
+            "min_time_steps"_a,
+             "max_time_steps"_a,
+             "integration_step"_a
+        )      
          .def("steer_batch", &DSSTMPCWrapper::steer_batch,
             "start_array"_a,
              "sample_array"_a,

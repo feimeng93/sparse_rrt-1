@@ -30,7 +30,7 @@
 // #define DEBUG
 // #define DEBUG_MPNET
 // #define DEBUG_CEM
-#define PRINT_GOAL
+// #define PRINT_GOAL
 
 deep_smp_mpc_sst_t::deep_smp_mpc_sst_t(
     const double* in_start, const double* in_goal,
@@ -186,6 +186,41 @@ void deep_smp_mpc_sst_t::step(system_interface* system, int min_time_steps, int 
     delete sample_state;
     delete sample_control;
 }
+
+void deep_smp_mpc_sst_t::step_with_output(enhanced_system_interface* system, int min_time_steps, int max_time_steps, double integration_step, double* steer_start, double* steer_goal)
+{
+    /*
+     * Generate a random sample
+     * Find the closest existing node
+     * Generate random control
+     * Propagate for random time with constant random control from the closest node
+     * If resulting state is valid, add a resulting state into the tree and perform sst-specific graph manipulations
+     */
+    double* sample_state = new double[this->state_dimension];
+    double* sample_control = new double[this->control_dimension];
+	this->random_state(sample_state);
+	this->random_control(sample_control);
+    sst_node_t* nearest = nearest_vertex(sample_state);
+	int num_steps = this->random_generator.uniform_int_random(min_time_steps, max_time_steps);
+    double duration = num_steps*integration_step;
+	if(system->propagate(
+	    nearest->get_point(), this->state_dimension, sample_control, this->control_dimension,
+	    num_steps, sample_state, integration_step))
+	{
+		add_to_tree(sample_state, sample_control, nearest, duration);
+	}
+    // copy to output
+    for (unsigned i=0; i <this->state_dimension; i++)
+    {
+        steer_start[i] = nearest->get_point()[i];
+        steer_goal[i] = sample_state[i];
+    }
+
+    delete sample_state;
+    delete sample_control;
+}
+
+
 
 
 sst_node_t* deep_smp_mpc_sst_t::nearest_vertex(const double* sample_state)

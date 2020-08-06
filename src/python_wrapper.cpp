@@ -25,7 +25,7 @@
 #include "systems/pendulum.hpp"
 #include "systems/rally_car.hpp"
 #include "systems/two_link_acrobot.hpp"
-#include "systems/enhanced_system.hpp"
+#include "systems/quadrotor.hpp"
 
 
 #include "motion_planners/sst.hpp"
@@ -580,6 +580,100 @@ public:
 };
 
 /**
+ * @brief CartPole with Obstacle system Wrapper
+ * @details python interface using C++ implementation
+ *
+ */
+ class __attribute__ ((visibility ("hidden"))) RectangleObs3DWrapper : public system_t
+ {
+ public:
+
+ 	/**
+ 	 * @brief Python wrapper of RectangleObsWrapper constructor
+ 	 * @details Python wrapper of RectangleObsWrapper constructor
+ 	 *
+ 	 * @param _obs_list: numpy array (N x 2) representing the middle point of the obstacles
+     * @param width: width of the rectangle obstacle
+ 	 */
+     RectangleObs3DWrapper(
+             const py::safe_array<double> &_obs_list,
+             double width,
+             const std::string &env_name
+      )
+     {
+         if (_obs_list.shape()[0] == 0) {
+             throw std::runtime_error("Should contain at least one obstacles.");
+         }
+         if (_obs_list.shape()[1] != 3) {
+             throw std::runtime_error("Shape of the obstacle input should be (N,2).");
+         }
+         if (width <= 0.) {
+             throw std::runtime_error("obstacle width should be non-negative.");
+         }
+         auto py_obs_list = _obs_list.unchecked<2>();
+         // initialize the array
+         std::vector<std::vector<double>> obs_list(_obs_list.shape()[0], std::vector<double>(3, 0.0));
+         // copy from python array to this array
+         for (unsigned int i = 0; i < obs_list.size(); i++) {
+             obs_list[i][0] = py_obs_list(i, 0);
+             obs_list[i][1] = py_obs_list(i, 1);
+             obs_list[i][2] = py_obs_list(i, 2);
+
+         }
+         if (env_name =="quadrotor"){
+             system_obs.reset(
+                new quadrotor_t(obs_list, width)
+             );
+             state_dimension = 13;
+             control_dimension = 4;
+         }
+    }
+
+    bool propagate(
+             const double* start_state, unsigned int state_dimension,
+             const double* control, unsigned int control_dimension,
+     	    int num_steps, double* result_state, double integration_step)
+    {
+        return system_obs->propagate(start_state, state_dimension, control, control_dimension,
+                                    num_steps, result_state, integration_step);
+    }
+
+    void enforce_bounds()
+    {
+    //    system_obs->enforce_bounds();
+    }
+
+    bool valid_state()
+    {
+    //    return system_obs->valid_state();
+    }
+
+    std::tuple<double, double> visualize_point(const double* state, unsigned int state_dimension) const override
+    {
+        return system_obs->visualize_point(state, state_dimension);
+    }
+    std::vector<std::pair<double, double>> get_state_bounds() const override
+    {
+        return system_obs->get_state_bounds();
+    }
+    std::vector<std::pair<double, double>> get_control_bounds() const override
+    {
+        return system_obs->get_control_bounds();
+    }
+
+    std::vector<bool> is_circular_topology() const override
+    {
+        return system_obs->is_circular_topology();
+    }
+
+ protected:
+ 	/**
+ 	 * @brief Created planner object
+ 	 */
+     std::unique_ptr<system_t> system_obs;
+ };
+
+/**
  * @brief pybind module
  * @details pybind module for all planners, systems and interfaces
  *
@@ -593,6 +687,8 @@ PYBIND11_MODULE(_sst_module, m) {
         .def(py::init<>());
    py::class_<euclidean_distance, distance_t>(m, "EuclideanDistance");
    py::class_<two_link_acrobot_distance, distance_t>(m, "TwoLinkAcrobotDistance").def(py::init<>());
+   py::class_<quadrotor_distance, distance_t>(m, "QuadrotorDistance").def(py::init<>());
+
    m.def("euclidean_distance", &create_euclidean_distance, "is_circular_topology"_a.noconvert());
 
    // Classes and interfaces for systems
@@ -618,7 +714,19 @@ PYBIND11_MODULE(_sst_module, m) {
        );
    py::class_<rally_car_t>(m, "RallyCar", system).def(py::init<>());
    py::class_<two_link_acrobot_t>(m, "TwoLinkAcrobot", system).def(py::init<>());
-
+   py::class_<quadrotor_t>(m, "Quadrotor", system).def(py::init<>());
+   /**
+    * Universal system interface for obs based envs
+    */
+   py::class_<RectangleObs3DWrapper>(m, "RectangleObs3DSystem", system)
+        .def(py::init<const py::safe_array<double> &,
+                      double,
+                      const std::string &>(),
+            "obstacle_list"_a,
+            "obstacle_width"_a,
+            "env_name"_a
+        );
+   /* RectangleObsSys ends here*/
    // Classes and interfaces for planners
    py::class_<PlannerWrapper> planner(m, "PlannerWrapper");
    planner

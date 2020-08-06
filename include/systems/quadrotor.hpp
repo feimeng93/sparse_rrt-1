@@ -16,14 +16,14 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
-#include "systems/enhanced_system.hpp"
+#include "systems/system.hpp"
 #define frame_size 0.25
 #include <cstdio>
 
-class quadrotor_obs_t : public enhanced_system_t
+class quadrotor_t : public system_t
 {
 public:
-	quadrotor_obs_t(){
+	quadrotor_t(){
 		state_dimension = 13;
 		control_dimension = 4;
 		temp_state = new double[state_dimension]();
@@ -33,7 +33,7 @@ public:
 		qomega = new double[4]();
 		validity = true;
 	}
-	quadrotor_obs_t(std::vector<std::vector<double>> _obs_list, double width){
+	quadrotor_t(std::vector<std::vector<double>> _obs_list, double width){
 		state_dimension = 13;
 		control_dimension = 4;
 		temp_state = new double[state_dimension]();
@@ -55,7 +55,7 @@ public:
 		}
 	}
 
-	virtual ~quadrotor_obs_t(){
+	virtual ~quadrotor_t(){
 		delete temp_state;
 		delete deriv;
 		delete qomega;

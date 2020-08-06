@@ -1,11 +1,16 @@
 #include "systems/quadrotor_obs.hpp"
 #include <iostream>
 #include <string>
+#include <utilities/debug.hpp>
 
 using namespace std;
 
+
 int main(){
-    enhanced_system_t* model = new quadrotor_obs_t();
+    double width = 1;
+    std::vector<std::vector<double>> obs_list;
+    obs_list.push_back(std::vector<double> {0., 0., 2.});
+    enhanced_system_t* model = new quadrotor_obs_t(obs_list, width);
     
     // initialize cem
     double loss_weights[13] = {1, 1, 1, 
@@ -26,12 +31,12 @@ int main(){
            step_size = 0.5;
    
     const double in_start[13] = {0, 0, 0, 
-                          0, 0, 0, 0,
+                          0, 0, 0, 1,
                           0, 0, 0,
                           0, 0, 0,
                           };
     double in_goal[13] = {1, 1, 1, 
-                          0, 0, 0, 0,
+                          0, 0, 0, 1,
                           0, 0, 0,
                           0, 0, 0,
                           };;
@@ -40,18 +45,18 @@ int main(){
     // Test system propagation
     double const control[4] = {-15, 0, 0, 0};
     double state[13] = {0, 0, 0, 
-                          0, 0, 0, 0,
-                          0, 0, 0,
-                          0, 0, 0,
-                          };
-    model->propagate(in_start, model->get_state_dimension(), 
-                     control, model->get_control_dimension(), 
-                     10, state, dt);
-    // std::copy(state, state + model->get_state_dimension(), std::ostream_iterator<double>(std::cout, ", "));
-    for(int i = 0; i < model->get_state_dimension(); i++){
-        std::cout<<state[i]<<", ";
-    }
-    std::cout<<std::endl;
+                        0, 0, 0, 1,
+                        0, 0, 0,
+                        0, 0, 0};
 
+    check_state_validity(model, state);
+    for(unsigned int step = 0; step < 10; step++){
+        std::cout << model->propagate(state, model->get_state_dimension(), 
+                                      control, model->get_control_dimension(), 
+                                      10, state, dt) << std::endl;
+        // print_state(model, state);
+        // check_state_validity(model, state);
+
+    }
     return 0;
 }

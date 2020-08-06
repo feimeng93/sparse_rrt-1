@@ -12,9 +12,12 @@ namespace trajectory_optimizers{
         // initialize control_dist: [nt * c_dim]
         std::normal_distribution<double>* control_dist = 
             new std::normal_distribution<double>[number_of_t * c_dim];
-        for(unsigned int i = 0; i < number_of_t * c_dim; i++){
-            mu_u[i] = mu_u0;
-            std_u[i] = std_u0;
+        for(unsigned int i = 0; i < number_of_t; i++){
+            for(unsigned int ui = 0; ui < c_dim; ui++){
+                mu_u[c_dim * i + ui] = mu_u0[ui];
+                std_u[c_dim * i + ui] = std_u0[ui];
+            }
+           
         }
         // initialize time_dist: [nt]
         std::normal_distribution<double>* time_dist = 
@@ -242,9 +245,12 @@ namespace trajectory_optimizers{
              current_state[i] = start[i];
         }
 
-        for(unsigned int i = 0; i < number_of_t * c_dim; i++){
-            mu_u[i] = mu_u0;
-            std_u[i] = std_u0;
+        for(unsigned int i = 0; i < number_of_t; i++){
+            for(unsigned int ui = 0; ui < c_dim; ui++){
+                mu_u[c_dim * i + ui] = mu_u0[ui];
+                std_u[c_dim * i + ui] = std_u0[ui];
+            }
+           
         }
         unsigned int early_stop_count = 0;
         std::vector<std::vector<double>> path; 

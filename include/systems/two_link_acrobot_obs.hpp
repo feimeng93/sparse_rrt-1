@@ -21,12 +21,12 @@
 class two_link_acrobot_obs_t : public enhanced_system_t
 {
 public:
-	// two_link_acrobot_obs_t(){
-	// 	state_dimension = 4;
-	// 	control_dimension = 1;
-	// 	temp_state = new double[state_dimension];
-	// 	deriv = new double[state_dimension];
-	// }
+	two_link_acrobot_obs_t(){
+		state_dimension = 4;
+		control_dimension = 1;
+		temp_state = new double[state_dimension];
+		deriv = new double[state_dimension];
+	}
 	two_link_acrobot_obs_t(std::vector<std::vector<double>>& _obs_list, double width)
 	{
 		state_dimension = 4;

@@ -1,32 +1,34 @@
 #include <iostream>
 #include <vector>
-#include "systems/cart_pole_obs.hpp"
-#include "systems/two_link_acrobot_obs.hpp"
+#include "systems/quadrotor_obs.hpp"
 #include "trajectory_optimizers/cem.hpp"
 // #include "trajectory_optimizers/cem_config.hpp"
 
 using namespace std;
 void test_acrobot(){
     std::vector<std::vector<double>> obs_list;
-    double width = 5;
-    obs_list.push_back(std::vector<double> {100.0, 200.0});
-    enhanced_system_t* model = new two_link_acrobot_obs_t(obs_list, width);
-    double loss_weights[4] = {1, 1, 0.3, 0.3};
-    int ns = 3,
-        nt = 2,
-        ne = 2,
-        max_it = 2;
+    double width = 1;
+    obs_list.push_back(std::vector<double> {1.0, 2.0, 3.0});
+    enhanced_system_t* model = new quadrotor_obs_t(obs_list, width);
+    double loss_weights[model -> get_state_dimension()] = {1, 1, 1, 
+                                                           1, 1, 1, 1,
+                                                           0.3, 0.3, 0.3,
+                                                           0.3, 0.3, 0.3};
+    int ns = 32,
+        nt = 1,
+        ne = 4,
+        max_it = 3;
     double converge_r = 1e-2,
-        mu_t = 0.1,
-        std_t = 0.2,
-        t_max = 0.5,
-        dt = 2e-2,
-        step_size = 0;
-    double std_u[1] = {4};
-    double mu_u[1] = {0.1};
+           mu_u = 0,
+           std_u = 4,
+           mu_t = 0.1,
+           std_t = 0.2,
+           t_max = 0.5,
+           dt = 2e-2,
+           step_size = 0;
     trajectory_optimizers::CEM cem(model, ns, nt,               
                     ne, converge_r, 
-                    &mu_u[0], &std_u[0], 
+                    mu_u, std_u, 
                     mu_t, std_t, t_max, 
                     dt, loss_weights, max_it, true, step_size);
     // double start[4] = {0, 0, 0, 0};
@@ -97,13 +99,13 @@ void test_cartpole(){
         ne = 4,
         max_it = 10;
     double converge_r = 1e-2,
+        mu_u = 0,
+        std_u = 100,
         mu_t = 5e-2,
         std_t = 1e-1,
         t_max = 0.1,
         dt = 2e-3,
         step_size = 0.75;
-    double *mu_u = new double[1]{0.0},
-           *std_u = new double[1]{100.};
     trajectory_optimizers::CEM cem(model, ns, nt,               
                     ne, converge_r, 
                     mu_u, std_u, 
