@@ -16,7 +16,7 @@ namespace networks{
         }
         void load_weights(std::string network_weights_path, std::shared_ptr<torch::jit::script::Module> &ptr, std::string device_id){
             if(network_weights_path == ""){
-                std::cout <<"Warning: Empty network_wieght_path, skipping model loading" << std::endl;
+                // std::cout <<"Warning: Empty network_wieght_path, skipping model loading" << std::endl;
             } else{
                 ptr.reset(new torch::jit::script::Module(
                     torch::jit::load(network_weights_path)));

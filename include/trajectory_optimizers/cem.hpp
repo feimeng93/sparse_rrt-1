@@ -27,7 +27,6 @@ namespace trajectory_optimizers{
                         mu_u0[ui] = control_means[ui];
                         std_u0[ui] = control_stds[ui];
                     }
-                    
                     mu_t0 = time_means;
                     std_t0 = time_stds;
                     this -> max_duration = max_duration;
@@ -62,21 +61,21 @@ namespace trajectory_optimizers{
 
             }
             ~CEM(){
-                delete mu_u0;
-                delete std_u0;
-                delete mu_u;
-                delete std_u;
-                delete mu_t;
-                delete std_t;
-                delete states;
-                delete controls;
-                delete time;
-                delete current_state;
-                delete sum_of_controls;
-                delete sum_of_square_controls;
-                delete sum_of_time;
-                delete sum_of_square_time;
-                delete active_mask;
+                delete[] mu_u0;
+                delete[] std_u0;
+                delete[] mu_u;
+                delete[] std_u;
+                delete[] mu_t;
+                delete[] std_t;
+                delete[] states;
+                delete[] controls;
+                delete[] time;
+                delete[] current_state;
+                delete[] sum_of_controls;
+                delete[] sum_of_square_controls;
+                delete[] sum_of_time;
+                delete[] sum_of_square_time;
+                delete[] active_mask;
             };
 
             unsigned int get_control_dimension();

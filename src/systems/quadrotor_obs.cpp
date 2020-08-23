@@ -12,7 +12,6 @@
 
 #include "systems/quadrotor_obs.hpp"
 #include <iostream>
-
 #define _USE_MATH_DEFINES
 #include <cmath>
 
@@ -94,7 +93,7 @@ bool quadrotor_obs_t::propagate(
 }
 
 bool quadrotor_obs_t::valid_state(){
-    /** Quaternion to rotation matrix
+     /** Quaternion to rotation matrix
      *  https://www.mathworks.com/help/fusion/ref/quaternion.rotmat.html    
      * also check 
      * https://ompl.kavrakilab.org/src_2omplapp_2apps_2QuadrotorPlanning_8cpp_source.html#l00069
@@ -106,21 +105,23 @@ bool quadrotor_obs_t::valid_state(){
             return false;
         }
     }
-    double a = temp_state[3],
-           b = temp_state[0],
-           c = temp_state[1],
-           d = temp_state[2];
-    std::vector<double> min_max = {std::numeric_limits<double>::max(), // min_x
-                                   std::numeric_limits<double>::min(), // max_x
-                                   std::numeric_limits<double>::max(), // min_y
-                                   std::numeric_limits<double>::min(), // max_y
-                                   std::numeric_limits<double>::max(), // min_z
-                                   std::numeric_limits<double>::min()}; // max_z
+
+    double a = temp_state[6],
+           b = temp_state[3],
+           c = temp_state[4],
+           d = temp_state[5];
+    std::vector<double> min_max = {MAX_X * 10, // min_x
+                                   MIN_X * 10, // max_x
+                                   MAX_X * 10, // min_y
+                                   MIN_X * 10, // max_y
+                                   MAX_X * 10, // min_z
+                                   MIN_X * 10}; // max_z
     for(unsigned f_i = 0; f_i < frame.size(); f_i++){
         double x = (2 * a * a - 1 + 2 * b * b) * frame.at(f_i).at(0) +
                    (2 * b * c + 2 * a * d) * frame.at(f_i).at(1) +
                    (2 * b * d - 2 * a * c) * frame.at(f_i).at(2) +
                    /*world frame*/temp_state[0];
+        // printf("%f, %f, %f\n", min_max.at(1), x, std::numeric_limits<double>::max());
         if(x < min_max.at(0)) {
             min_max.at(0) = x;
         } else if (x > min_max.at(1)) {
@@ -286,16 +287,24 @@ std::vector<bool> quadrotor_obs_t::is_circular_topology() const{
 }
 
 void quadrotor_obs_t::normalize(const double* state, double* normalized){
-    for(int i = 0; i < state_dimension; i++){
+    for(int i = 0; i < 3; i++){
+        normalized[i] = state[i] / MAX_X;
+    }
+    for(int i = 3; i < state_dimension; i++){
         normalized[i] = state[i];
     }
-
+    enforce_bounds_SO3(&normalized[3]);
 }
 
 void quadrotor_obs_t::denormalize(double* normalized,  double* state){
-    for(int i = 0; i < state_dimension; i++){
+    for(int i = 0; i < 3; i++){
+        state[i] = normalized[i] * MAX_X; 
+    }
+    for(int i = 3; i < state_dimension; i++){
         state[i] = normalized[i]; 
     }
+    enforce_bounds_SO3(&state[3]);
+
 }
 
 std::tuple<double, double> quadrotor_obs_t::visualize_point(const double* state, unsigned int state_dimension) const{
@@ -346,30 +355,9 @@ double quadrotor_obs_t::distance(const double* point1, const double* point2, uns
      * StateSpace has weights 1 * SE3 + 0.3 * Vel = 1 * R3 + 1 * SO3 + 0.3 * R6
      * https://ompl.kavrakilab.org/src_2omplapp_2apps_2QuadrotorPlanning_8cpp_source.html#l00099
     */
-    return dist + dq /*+ 0.3 * dist_v*/;
+    return dist + dq + 0.3 * dist_v;
 }
 
 double quadrotor_obs_t::get_loss(double* point1, const double* point2, double* weight){
-    double dist = 0.;
-    for(int i = 0; i < 3; i++){
-        dist += (point1[i] - point2[i]) * (point1[i] - point2[i]) * weight[i] * weight[i];
-    }
-    dist = sqrt(dist);
-
-    double dq  = 0.;
-    for(int i = 3; i < 7; i++){
-        dq  += point1[i] * point2[i] * weight[i];
-    }
-    dq = fabs(dq);
-    if (dq > 1.0 - MAX_QUATERNION_NORM_ERROR)
-        return 0.0;
-    dq = acos(dq);
-
-    double ds = 0;
-    for(int i = 7; i < 13; i++){
-        ds += (point1[i] - point2[i]) * (point1[i] - point2[i]) * weight[i] * weight[i];
-    }
-    ds = sqrt(ds);
-
-    return dist + dq + ds;
+    return distance(point1, point2, state_dimension);
 }

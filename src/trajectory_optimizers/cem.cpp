@@ -66,8 +66,14 @@ namespace trajectory_optimizers{
                 for (unsigned int ti = 0; ti < number_of_t; ti++){
                     // generate control samples
                     for(unsigned int ci = 0; ci < c_dim; ci++){
-                        controls[si* number_of_t * c_dim + ti * c_dim + ci] = 
-                            control_dist[ti](generator);
+                        double _control = control_dist[ti * c_dim + ci](generator);
+                        if( _control < system->get_control_bounds()[ci].first){
+                            _control = system->get_control_bounds()[ci].first;
+                        } else if ( _control > system->get_control_bounds()[ci].second){
+                             _control = system->get_control_bounds()[ci].second;
+                        }
+                        // std::cout<<"sampled_c:"<<_control<<std::endl;
+                        controls[si* number_of_t * c_dim + ti * c_dim + ci] = _control;
                     }
                     // generate duration samples and wrap to [0, max_duration]
                     time[si* number_of_t + ti] = 
@@ -210,18 +216,14 @@ namespace trajectory_optimizers{
                     mu_u[ti * c_dim + ci] = step_size * sum_of_controls[ti * c_dim + ci] / number_of_elite + 
                         (1-step_size)*mu_u[ti * c_dim + ci];
                     std_u[ti * c_dim + ci] = step_size * sqrt(
-                        sum_of_square_controls[ti * c_dim + ci] / 
-                        number_of_elite - mu_u[ti * c_dim + ci] * mu_u[ti * c_dim + ci]
-                        ) + (1-step_size) * std_u[ti * c_dim + ci];
+                        std::max(sum_of_square_controls[ti * c_dim + ci] / 
+                                 number_of_elite - mu_u[ti * c_dim + ci] * mu_u[ti * c_dim + ci], 1e-10)) + (1-step_size) * std_u[ti * c_dim + ci];
+                    // std::cout<<"mu_u:"<<mu_u[ti * c_dim + ci]<<","<<std_u[ti * c_dim + ci]<<std::endl;
+
                 }
                 mu_t[ti] = step_size * sum_of_time[ti] / number_of_elite + (1-step_size)*mu_t[ti];
-                std_t[ti] = step_size * sqrt(
-                    sum_of_square_time[ti] / number_of_elite - 
-                        mu_t[ti] * mu_t[ti]
-                    ) + (1-step_size) * (std_t[ti]);
+                std_t[ti] = step_size * sqrt(std::max(sum_of_square_time[ti]/ number_of_elite - mu_t[ti] * mu_t[ti], 1e-10)) + (1-step_size) * (std_t[ti]);
             }
-           
-        
 
             if(verbose){
                 std::cout <<it<<"\tloss:"<< loss.at(0).first<<"\tminLoss:"<< min_loss;
@@ -234,8 +236,8 @@ namespace trajectory_optimizers{
                     break;
             }
         }// end loop
-        delete control_dist;
-        delete time_dist;
+        delete[] control_dist;
+        delete[] time_dist;
 
     }
 

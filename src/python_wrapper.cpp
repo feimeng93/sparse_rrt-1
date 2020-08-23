@@ -605,7 +605,7 @@ public:
              throw std::runtime_error("Should contain at least one obstacles.");
          }
          if (_obs_list.shape()[1] != 3) {
-             throw std::runtime_error("Shape of the obstacle input should be (N,2).");
+             throw std::runtime_error("Shape of the obstacle input should be (N,3).");
          }
          if (width <= 0.) {
              throw std::runtime_error("obstacle width should be non-negative.");

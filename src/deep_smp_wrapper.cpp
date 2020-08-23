@@ -6,7 +6,7 @@
 #include "systems/cart_pole_obs.hpp"
 #include "systems/two_link_acrobot_obs.hpp"
 #include "systems/quadrotor_obs.hpp"
-
+#include "systems/car_obs.hpp"
 #include "trajectory_optimizers/cem.hpp"
 // #include "trajectory_optimizers/cem_cuda.hpp"
 
@@ -69,7 +69,7 @@ public:
             throw std::runtime_error("obstacle width should be non-negative.");
         }
 
-        if (system_type == "acrobot_obs" || system_type == "cartpole_obs"){
+        if (system_type == "acrobot_obs" || system_type == "cartpole_obs" || system_type == "car_obs"){
             // Convert obs_pixels to tensor
             
             if (obs_list_array.shape()[1] != 2) {
@@ -105,11 +105,13 @@ public:
             }
             
             // TODO: pass from para
-            // for (unsigned i = 0; i < obs_voxel_data.shape(0); i++)
-            // {
-            //     obs_vec.push_back(float(obs_voxel_data(i)));
-            // }
-            obs_tensor = torch::zeros({1,32,32,32}).to(torch::Device(device_id));
+            for (unsigned i = 0; i < obs_voxel_data.shape(0); i++)
+            {
+                obs_vec.push_back(float(obs_voxel_data(i)));
+            }
+            obs_tensor = torch::from_blob(obs_vec.data(), {1, 32, 32, 32}).to(torch::Device(device_id));
+
+            // obs_tensor = torch::zeros({1,32,32,32}).to(torch::Device(device_id));
         } else {
             throw std::runtime_error("undefined system");
         }      
@@ -125,6 +127,9 @@ public:
         } else if (system_type == "quadrotor_obs") {
             system = new quadrotor_obs_t(obs_list, width);
             distance_computer = quadrotor_obs_t::distance;
+        } else if (system_type == "car_obs"){
+            system = new car_obs_t(obs_list, width);
+            distance_computer = car_obs_t::distance;
         } else {
             throw std::runtime_error("undefined system");
         }
@@ -162,7 +167,7 @@ public:
         }
         if (solver_type == "cem_cuda")
         {
-            throw std::runtime_error("bugs to be solved");
+            throw std::runtime_error("Not implemented");
             // cem.reset(
             //     new trajectory_optimizers::CEM_CUDA(
             //         system, np, ns, nt,               

@@ -8,8 +8,8 @@
             "request": "launch",
             // Resolved by CMake Tools:
             // "program": "${command:cmake.launchTargetPath}",
-            // "program": "${workspaceFolder}/bin/test_mpc",
-            "program": "${workspaceFolder}/bin/test_planner",
+            "program": "${workspaceFolder}/bin/test_mpc",
+            // "program": "${workspaceFolder}/bin/test_planner",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",

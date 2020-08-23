@@ -289,14 +289,20 @@ std::vector<bool> quadrotor_t::is_circular_topology() const{
 }
 
 void quadrotor_t::normalize(const double* state, double* normalized){
-    for(int i = 0; i < state_dimension; i++){
+    for(int i = 0; i < 3; i++){
+        normalized[i] = state[i] / MAX_X;
+    }
+    for(int i = 3; i < state_dimension; i++){
         normalized[i] = state[i];
     }
 
 }
 
 void quadrotor_t::denormalize(double* normalized,  double* state){
-    for(int i = 0; i < state_dimension; i++){
+    for(int i = 0; i < 3; i++){
+        state[i] = normalized[i] * MAX_X; 
+    }
+    for(int i = 3; i < state_dimension; i++){
         state[i] = normalized[i]; 
     }
 }
@@ -349,7 +355,7 @@ double quadrotor_t::distance(const double* point1, const double* point2, unsigne
      * StateSpace has weights 1 * SE3 + 0.3 * Vel = 1 * R3 + 1 * SO3 + 0.3 * R6
      * https://ompl.kavrakilab.org/src_2omplapp_2apps_2QuadrotorPlanning_8cpp_source.html#l00099
     */
-    return dist + dq /*+ 0.3 * dist_v*/;
+    return dist + dq + 0.3 * dist_v;
 }
 
 double quadrotor_t::get_loss(double* point1, const double* point2, double* weight){

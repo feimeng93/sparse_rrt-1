@@ -48,8 +48,8 @@ namespace networks{
         system -> normalize(state, normalized_state);
         system -> normalize(goal_state, normalized_goal);
         std::vector<torch::jit::IValue> input_container;
-        torch::Tensor state_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
-        torch::Tensor goal_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
+        torch::Tensor state_tensor = torch::ones({1, system->get_state_dimension()}).to(torch::Device(device_id)); 
+        torch::Tensor goal_tensor = torch::ones({1, system->get_state_dimension()}).to(torch::Device(device_id)); 
         // set value state_goal with dim 1 x 8
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
             state_tensor[0][si] = normalized_state[si];    
@@ -115,9 +115,7 @@ namespace networks{
                 //     //     refine_lr * refine_grad * (refine_norm > refine_threshold);
 
                 // }
-                
             }
-        
             if(cost_reselection){
                 cost_input = at::cat({predicted_state_tensor, goal_tensor_expand}, 1).to(torch::Device(device_id));
                 input_container.at(0) = cost_input;
@@ -154,8 +152,8 @@ namespace networks{
         system -> normalize(state, normalized_state);
         system -> normalize(goal_state, normalized_goal);
         std::vector<torch::jit::IValue> input_container;
-        torch::Tensor state_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
-        torch::Tensor goal_tensor = torch::ones({1, 4}).to(torch::Device(device_id)); 
+        torch::Tensor state_tensor = torch::ones({1, system->get_state_dimension()}).to(torch::Device(device_id)); 
+        torch::Tensor goal_tensor = torch::ones({1, system->get_state_dimension()}).to(torch::Device(device_id)); 
         // set value state_goal with dim 1 x 8
         for(unsigned int si = 0; si < system->get_state_dimension(); si++){
             state_tensor[0][si] = normalized_state[si];    
@@ -213,8 +211,8 @@ namespace networks{
 
         }
         std::vector<torch::jit::IValue> input_container;
-        torch::Tensor state_tensor = torch::ones({NP, 4}).to(torch::Device(device_id)); 
-        torch::Tensor goal_tensor = torch::ones({NP, 4}).to(torch::Device(device_id)); 
+        torch::Tensor state_tensor = torch::ones({NP, system->get_state_dimension()}).to(torch::Device(device_id)); 
+        torch::Tensor goal_tensor = torch::ones({NP, system->get_state_dimension()}).to(torch::Device(device_id)); 
         // set value state_goal with dim 1 x 8
         for (unsigned int pi=0; pi<NP; pi++)
         {

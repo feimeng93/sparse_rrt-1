@@ -18,7 +18,7 @@
 #ifndef TORCH_H
 #include <torch/script.h>
 #endif
-
+#include <cstdio>
 #include <iostream>
 #include <deque>
 
@@ -434,18 +434,25 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
     double* costs = new double[cem_ptr -> get_num_step()];
     double* state = new double[this->state_dimension];
     cem_ptr -> solve(start, sample, solution_u, solution_t);
+    // for(int ti = 0; ti < cem_ptr -> get_num_step(); ti++) {
+    //     printf("solution_t:%f\n", solution_t[ti]);
+    // }
     double duration = 0;
     for(unsigned int si = 0; si < this->state_dimension; si++){ //copy start state
         state[si] = start[si]; 
         terminal_state[si] = start[si]; 
     }
+    // printf("%f, %f, %f, %f, %f, %f, %f\n", state[0], state[1], state[2], state[3],state[4],state[5],state[6]);
+    // printf("%f, %f, %f, %f, %f, %f, %f\n", sample[0], sample[1], sample[2], sample[3],sample[4],sample[5],sample[6]);
+
+    // printf("%f, %f, %f, %f, %f, %f, %f\n", terminal_state[0],terminal_state[1],terminal_state[2],terminal_state[3],terminal_state[4],terminal_state[5],terminal_state[6]);
     double min_loss = 1e3;// initialize logging variables
     unsigned int best_i = 0;
 
     for(unsigned int ti = 0; ti < cem_ptr -> get_num_step(); ti++){ // propagate
         if (system -> propagate(state, 
             this->state_dimension, 
-            &solution_u[ti], 
+            &solution_u[ti*system->get_control_dimension()], 
             this->control_dimension, 
             (int)(solution_t[ti]/integration_step), 
             state,
@@ -459,8 +466,10 @@ double deep_smp_mpc_sst_t::steer(enhanced_system_t* system, const double* start,
                     min_loss = current_loss;
                     best_i = ti;
                     for(unsigned int si = 0; si < this->state_dimension; si++){// save best state
-                        terminal_state[si] = state[si]; 
+                        terminal_state[si] = state[si];
+                        // printf("%f, ", terminal_state[si]); 
                     }
+                    // printf("/n");
                     if (min_loss < cem_ptr -> converge_radius){
                         break;
                     }
@@ -629,9 +638,9 @@ void deep_smp_mpc_sst_t::neural_step(enhanced_system_t* system, double integrati
     //  add neural sampling 
     neural_sample(system, nearest->get_point(), neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection); 
     // steer func
-    // for(unsigned int i = 0; i < state_dimension; i++){
-    //     system->temp_state[i] = neural_sample_state[i];
-    // }
+    for(unsigned int i = 0; i < state_dimension; i++){
+        system->temp_state[i] = neural_sample_state[i];
+    }
     if (system -> valid_state()){
         double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);
         // std::cout<<"duration:" << duration << std::endl;    
@@ -673,8 +682,10 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
         }
     } else {
         neural_sample(system, shm_current_state, neural_sample_state, env_vox, refine, refine_threshold, using_one_step_cost, cost_reselection);
-
     }
+    // printf("%f, %f, %f, %f, %f, %f, %f\n", neural_sample_state[0], neural_sample_state[1], neural_sample_state[2],
+    //     neural_sample_state[3],neural_sample_state[4],neural_sample_state[5],neural_sample_state[6]);
+
     // sst_node_t* nearest = nearest_vertex(neural_sample_state);
     sst_node_t* nearest = nearest_vertex(shm_current_state);
 
@@ -685,6 +696,7 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
     }
 
     bool reset = true;
+    // printf("%d", system -> valid_state());
     if (system -> valid_state()){
         shm_counter[0]++;
         double duration = steer(system, nearest->get_point(), neural_sample_state, terminal_state, integration_step);
@@ -709,8 +721,6 @@ void deep_smp_mpc_sst_t::deep_smp_step(enhanced_system_t* system, double integra
             //         shm_current_state[si] = root->get_point()[si];
             //     }
             // }
-            
-            
         } 
     } 
   

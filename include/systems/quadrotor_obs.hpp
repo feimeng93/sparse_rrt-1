@@ -56,10 +56,10 @@ public:
 	}
 
 	virtual ~quadrotor_obs_t(){
-		delete temp_state;
-		delete deriv;
-		delete qomega;
-		delete u;
+		delete[] temp_state;
+		delete[] deriv;
+		delete[] qomega;
+		delete[] u;
 		// obs_list.clear();
 	}
 	/**
@@ -139,7 +139,7 @@ protected:
 	void update_derivative(const double* control);
 	double *u;
     double *qomega;
-	bool validity;
+	bool validity = true;
 	std::vector<std::vector<double>> frame;
 	std::vector<std::vector<double>> obs_min_max;
 

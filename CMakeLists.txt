@@ -25,7 +25,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(INCLUDE_DIRECTORIES include)
 
 add_definitions(-O3)
-SET(CMAKE_BUILD_TYPE "Debug")
+# SET(CMAKE_BUILD_TYPE "Debug")
 #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 #SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
 
@@ -117,6 +117,7 @@ set(MPC_SOURCE
     src/systems/cart_pole_obs.cpp
     src/systems/two_link_acrobot_obs.cpp
     src/systems/quadrotor_obs.cpp
+    src/systems/car_obs.cpp
     src/trajectory_optimizers/cem.cpp
     # src/trajectory_optimizers/cem_cuda.cu
     )
@@ -173,15 +174,15 @@ set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
 ### test trajectory optimizers MPC
 add_executable(
     test_mpc
-    src/tests/trajectory_optimizers/test_mpc.cpp
-    ${MPC_SOURCE}
+    tests/trajectory_optimizers/test_mpc.cpp
+    # ${MPC_SOURCE}
     )
 target_link_libraries(test_mpc CEMMPC)
 
 
 ### test planners
 add_executable(test_planner
-    src/tests/motion_planners/test_planner.cpp
+    tests/motion_planners/test_planner.cpp
     ${DEEP_SMP_MODULE}
     )
 target_link_libraries(
@@ -191,22 +192,13 @@ target_link_libraries(
     )
 set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
 
-### test quadrotor system
-add_executable(test_quadrotor
-    src/systems/quadrotor_obs.cpp
-    src/tests/systems/test_quadrotor.cpp
+### test system
+## test 
+add_executable(test_system
+    src/systems/cart_pole_obs.cpp
+    src/systems/two_link_acrobot_obs.cpp
+    src/systems/quadrotor_obs.cpp    tests/systems/test_system.cpp
     )
 
-add_executable(test_planner_quadrotor
-    src/systems/quadrotor_obs.cpp
-    src/tests/motion_planners/test_planner_quadrotor.cpp
-    ${DEEP_SMP_MODULE}
-    )
-target_link_libraries(
-    test_planner_quadrotor   
-    ${TORCH_LIBRARIES}
-    CEMMPC
-    )
-set_property(TARGET test_planner_quadrotor PROPERTY CXX_STANDARD 14)
 
 
