@@ -7,8 +7,13 @@
 #include "systems/two_link_acrobot_obs.hpp"
 #include "systems/quadrotor_obs.hpp"
 #include "systems/car_obs.hpp"
+
 #include "trajectory_optimizers/cem.hpp"
-// #include "trajectory_optimizers/cem_cuda.hpp"
+#include "trajectory_optimizers/cem_cuda_cartpole.hpp"
+#include "trajectory_optimizers/cem_cuda_acrobot.hpp"
+#include "trajectory_optimizers/cem_cuda_car.hpp"
+#include "trajectory_optimizers/cem_cuda_quadrotor.hpp"
+
 
 #include "networks/mpnet.hpp"
 #include "networks/mpnet_cost.hpp"
@@ -167,15 +172,52 @@ public:
         }
         if (solver_type == "cem_cuda")
         {
-            throw std::runtime_error("Not implemented");
-            // cem.reset(
-            //     new trajectory_optimizers::CEM_CUDA(
-            //         system, np, ns, nt,               
-            //         ne, converge_r, obs_list, 
-            //         mean_control, std_control, 
-            //         mu_t, std_t, t_max, 
-            //         dt, loss_weights, max_it, verbose, step_size)
-            // );
+            // see what system we are using
+            if (system_type == "acrobot_obs")
+            {
+                cem.reset(
+                    new trajectory_optimizers_acrobot::CEM_CUDA_acrobot(
+                        system, np, ns, nt,               
+                        ne, converge_r, obs_list, 
+                        mean_control, std_control, 
+                        mu_t, std_t, t_max, 
+                        dt, loss_weights, max_it, verbose, step_size)
+                );
+            }
+            else if (system_type == "cartpole_obs")
+            {
+                cem.reset(
+                    new trajectory_optimizers_cartpole::CEM_CUDA_cartpole(
+                        system, np, ns, nt,               
+                        ne, converge_r, obs_list, 
+                        mean_control, std_control, 
+                        mu_t, std_t, t_max, 
+                        dt, loss_weights, max_it, verbose, step_size)
+                );
+            }
+            else if (system_type == "car_obs")
+            {
+                cem.reset(
+                    new trajectory_optimizers_car::CEM_CUDA_car(
+                        system, np, ns, nt,               
+                        ne, converge_r, obs_list, 
+                        mean_control, std_control, 
+                        mu_t, std_t, t_max, 
+                        dt, loss_weights, max_it, verbose, step_size)
+                );
+            }
+            else if (system_type == "quadrotor_obs")
+            {
+                cem.reset(
+                    new trajectory_optimizers_quadrotor::CEM_CUDA_quadrotor(
+                        system, np, ns, nt,               
+                        ne, converge_r, obs_list, 
+                        mean_control, std_control, 
+                        mu_t, std_t, t_max, 
+                        dt, loss_weights, max_it, verbose, step_size)
+                );
+            }
+
         }
         
         else if (solver_type == "cem")

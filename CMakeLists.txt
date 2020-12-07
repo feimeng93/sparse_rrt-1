@@ -79,17 +79,12 @@ set(SOURCE_FILES
     src/motion_planners/rrt.cpp
     src/motion_planners/sst.cpp
     src/motion_planners/sst_backend.cpp
-    #src/nearest_neighbors/graph_nearest_neighbors.cpp
     src/systems/car.cpp
     src/systems/cart_pole.cpp
     src/systems/pendulum.cpp
     src/systems/point.cpp
     src/systems/rally_car.cpp
     src/systems/two_link_acrobot.cpp
-    #src/utilities/random.cpp
-    #src/utilities/timer.cpp
-    #src/image_creation/svg_image.cpp
-    #src/image_creation/planner_visualization.cpp
     src/systems/quadrotor.cpp
     src/systems/distance_functions.cpp
     ${PLANNING_UTILS}
@@ -119,7 +114,12 @@ set(MPC_SOURCE
     src/systems/quadrotor_obs.cpp
     src/systems/car_obs.cpp
     src/trajectory_optimizers/cem.cpp
-    # src/trajectory_optimizers/cem_cuda.cu
+
+    src/trajectory_optimizers/cem_cuda_cartpole.cu
+    src/trajectory_optimizers/cem_cuda_acrobot.cu
+    src/trajectory_optimizers/cem_cuda_car.cu
+    src/trajectory_optimizers/cem_cuda_quadrotor.cu
+
     )
 
 # set_property(TARGET CEMMPC PROPERTY CXX_STANDARD 11)
@@ -127,22 +127,6 @@ set(MPC_SOURCE
 add_library(CEMMPC SHARED
     ${MPC_SOURCE}
     )
-
-### for steer module
-# add_library(steer_module SHARED
-#     src/systems/cart_pole_obs.cpp
-#     src/systems/two_link_acrobot_obs.cpp
-#     ${PROJECT_SOURCE_DIR}/src/steer_wrapper.cpp
-#     )
-# target_link_libraries(steer_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
-
-# Don't prepend wrapper library name with lib and add to Python libs.
-# set_target_properties(steer_module PROPERTIES
-#         PREFIX "_"
-#         SUFFIX ".so"
-#         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
-#         )
-#### for steer module
 
 set(DEEP_SMP_MODULE
     ${PLANNING_UTILS}
@@ -175,7 +159,6 @@ set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
 add_executable(
     test_mpc
     tests/trajectory_optimizers/test_mpc.cpp
-    # ${MPC_SOURCE}
     )
 target_link_libraries(test_mpc CEMMPC)
 
@@ -193,7 +176,6 @@ target_link_libraries(
 set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
 
 ### test system
-## test 
 add_executable(test_system
     src/systems/cart_pole_obs.cpp
     src/systems/two_link_acrobot_obs.cpp

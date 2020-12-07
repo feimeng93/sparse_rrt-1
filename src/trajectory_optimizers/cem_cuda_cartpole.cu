@@ -1,4 +1,4 @@
-#include "trajectory_optimizers/cem_cuda.hpp"
+#include "trajectory_optimizers/cem_cuda_cartpole.hpp"
 #include "systems/enhanced_system.hpp"
 
 //#define PROFILE
@@ -37,7 +37,7 @@
 #define NOBS 7
 #define OBS_PENALTY 1000.0
 
-namespace trajectory_optimizers{
+namespace trajectory_optimizers_cartpole{
     __global__ void initCurand(curandState* state, unsigned long seed) {
         int idx = threadIdx.x + blockIdx.x * blockDim.x;
         curand_init(seed, idx, 0, &state[idx]);
@@ -45,8 +45,8 @@ namespace trajectory_optimizers{
 
 
     __global__ 
-    void set_statistics(double* d_mean_time, const double mean_time, double* d_mean_control, const double mean_control, 
-        double* d_std_control, const double std_control, double* d_std_time, const double std_time, int NT){
+    void set_statistics(double* d_mean_time, const double mean_time, double* d_mean_control, const double* mean_control, 
+        double* d_std_control, const double* std_control, double* d_std_time, const double std_time, int NT){
         unsigned int np = blockIdx.x * blockDim.x + threadIdx.x;
         unsigned int nt = blockIdx.z * blockDim.z + threadIdx.z;
         unsigned int id = np * NT + nt;
@@ -54,8 +54,8 @@ namespace trajectory_optimizers{
         // printf("inside set_statistics. id: (%d, %d)\n", np, nt);
 
         d_mean_time[id] = mean_time;
-        d_mean_control[id] = mean_control;
-        d_std_control[id] = std_control;
+        d_mean_control[id] = mean_control[0];
+        d_std_control[id] = std_control[0];
         d_std_time[id] = std_time;
         // printf("inside set_statistics. d_mean_time: %f\n", d_mean_time[id]);
         // printf("inside set_statistics. d_mean_control: %f\n", d_mean_control[id]);
@@ -356,14 +356,13 @@ namespace trajectory_optimizers{
 
     }
     
-
-    CEM_CUDA::CEM_CUDA(enhanced_system_t* model, unsigned int num_of_problems, unsigned int number_of_samples, unsigned int number_of_t,
+    CEM_CUDA_cartpole::CEM_CUDA_cartpole(enhanced_system_t* model, unsigned int num_of_problems, unsigned int number_of_samples, unsigned int number_of_t,
         unsigned int number_of_elite,  double converge_r,
         std::vector<std::vector<double>>& _obs_list,
-        double control_means, double control_stds, 
+        double* control_means, double* control_stds, 
         double time_means, double time_stds, double max_duration,
         double integration_step, double* loss_weights, unsigned int max_iteration, bool verbose, double step_size)
-        : CEM(model, number_of_samples, number_of_t,
+        : trajectory_optimizers::CEM(model, number_of_samples, number_of_t,
             number_of_elite, converge_r, 
             control_means, control_stds, 
             time_means, time_stds, max_duration,
@@ -381,8 +380,13 @@ namespace trajectory_optimizers{
         this -> NS = number_of_samples;
         this -> NT = number_of_t;
         this -> N_ELITE = number_of_elite;
-        mu_u0 = control_means;
-        std_u0 = control_stds;
+        mu_u0 = new double[DIM_CONTROL];
+        std_u0 = new double[DIM_CONTROL];
+        for (unsigned i=0; i < DIM_CONTROL; i++)
+        {
+            mu_u0[i] = control_means[i];
+            std_u0[i] = control_stds[i];
+        }
         mu_t0 = time_means;
         std_t0 = time_stds;
         this -> max_duration = max_duration;
@@ -425,8 +429,9 @@ namespace trajectory_optimizers{
         cudaMalloc(&d_top_k_loss, NP * NS * sizeof(double)); 
 
         cudaMalloc(&d_loss_ind, NP * NS * sizeof(int));
-        loss_ind = (int*) malloc(NP * NS * sizeof(int));
-        memset(loss_ind, 0, NP * NS  * sizeof(int));
+        //loss_ind = (int*) malloc(NP * NS * sizeof(int));
+        loss_ind = new int[NP*NS]();
+        //memset(loss_ind, 0, NP * NS  * sizeof(int));
         
         loss = new double[NP*NS]();
         loss_pair.resize(NS, std::make_pair(0., 0));
@@ -465,7 +470,7 @@ namespace trajectory_optimizers{
         //printf("done, execution:\n");
 
     }
-    void CEM_CUDA::solve(const double* start, const double* goal, double* best_u, double* best_t){
+    void CEM_CUDA_cartpole::solve(const double* start, const double* goal, double* best_u, double* best_t){
         // auto begin = std::chrono::system_clock::now();
         // start and goal should be NP * DIM_STATE
 
@@ -723,11 +728,11 @@ namespace trajectory_optimizers{
     }
 
     
-    unsigned int CEM_CUDA::get_control_dimension(){
+    unsigned int CEM_CUDA_cartpole::get_control_dimension(){
         return c_dim * NT;
     }
 
-    unsigned int CEM_CUDA::get_num_step(){
+    unsigned int CEM_CUDA_cartpole::get_num_step(){
         return NT;
     }
 }
