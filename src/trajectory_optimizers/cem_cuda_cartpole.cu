@@ -412,6 +412,13 @@ namespace trajectory_optimizers_cartpole{
         //printf("setup...\n");
         // best_ut = (double*) malloc(2 * NP * NT /*time + control*/ * sizeof(double));   // 2 x NP x NT
         cudaMalloc(&d_best_ut, NP * NT * 2 * sizeof(double)); 
+
+        cudaMalloc(&d_mu_u0, DIM_CONTROL * sizeof(double)); 
+        cudaMalloc(&d_std_u0, DIM_CONTROL * sizeof(double)); 
+        cudaMemcpy(d_mu_u0, mu_u0, DIM_CONTROL * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_std_u0, std_u0, DIM_CONTROL * sizeof(double), cudaMemcpyHostToDevice);
+
+
         // temp state, derivative, control, time samples
             // temp_state = (double*) malloc(NS * DIM_STATE * sizeof(double));
         cudaMalloc(&d_temp_state, NP * NS * DIM_STATE * sizeof(double)); 
@@ -503,7 +510,7 @@ namespace trajectory_optimizers_cartpole{
         profile_start = std::chrono::high_resolution_clock::now();
         #endif
 
-        set_statistics<<<grid, block_pt>>>(d_mean_time, mu_t0, d_mean_control, mu_u0, d_std_control, std_u0, d_std_time, std_t0, NT);
+        set_statistics<<<grid, block_pt>>>(d_mean_time, mu_t0, d_mean_control, d_mu_u0, d_std_control, d_std_u0, d_std_time, std_t0, NT);
 
         #ifdef PROFILE
         profile_stop = std::chrono::high_resolution_clock::now();

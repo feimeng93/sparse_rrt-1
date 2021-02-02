@@ -26,10 +26,6 @@ namespace networks{
             const double* state,  double* goal_state, double* neural_sample_state, 
             bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection);
 
-        void mpnet_sample_single_batch(enhanced_system_t* system, torch::Tensor& env_vox_tensor, 
-            const double* state,  double* goal_state, double* neural_sample_state, 
-            bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, const int NP);
-
         void mpnet_sample_batch(enhanced_system_t* system, torch::Tensor& env_vox_tensor, 
             const double* state,  double* goal_state, double* neural_sample_state, 
             bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, const int NP);

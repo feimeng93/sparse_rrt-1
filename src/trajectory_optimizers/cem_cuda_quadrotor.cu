@@ -330,7 +330,7 @@ namespace trajectory_optimizers_quadrotor{
 
                 // update derivs
                 update_derivative(temp_state+id*DIM_STATE, control+control_id*DIM_CONTROL, deriv+id*DIM_STATE);
-                //printf("in propagate. id = %d, num_step=%d, deriv: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, num_step, deriv[id*DIM_STATE+0],deriv[id*DIM_STATE+1],deriv[id*DIM_STATE+2],deriv[id*DIM_STATE+3],deriv[id*DIM_STATE+4],deriv[id*DIM_STATE+5],deriv[id*DIM_STATE+6],deriv[id*DIM_STATE+7],deriv[id*DIM_STATE+8],deriv[id*DIM_STATE+9],deriv[id*DIM_STATE+10],deriv[id*DIM_STATE+11],deriv[id*DIM_STATE+12]);
+                // printf("in propagate. id = %d, num_step=%d, deriv: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, num_step, deriv[id*DIM_STATE+0],deriv[id*DIM_STATE+1],deriv[id*DIM_STATE+2],deriv[id*DIM_STATE+3],deriv[id*DIM_STATE+4],deriv[id*DIM_STATE+5],deriv[id*DIM_STATE+6],deriv[id*DIM_STATE+7],deriv[id*DIM_STATE+8],deriv[id*DIM_STATE+9],deriv[id*DIM_STATE+10],deriv[id*DIM_STATE+11],deriv[id*DIM_STATE+12]);
 
                 //TODO: control index is wrong, need to FIX CAR!!!
 
@@ -339,7 +339,7 @@ namespace trajectory_optimizers_quadrotor{
                 {
                     temp_state[id*DIM_STATE+si] += DT*deriv[id*DIM_STATE+si];
                 }
-                //printf("in propagate. id = %d, num_step=%d, temp_state: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, num_step, temp_state[id*DIM_STATE+0],temp_state[id*DIM_STATE+1],temp_state[id*DIM_STATE+2],temp_state[id*DIM_STATE+3],temp_state[id*DIM_STATE+4],temp_state[id*DIM_STATE+5],temp_state[id*DIM_STATE+6],temp_state[id*DIM_STATE+7],temp_state[id*DIM_STATE+8],temp_state[id*DIM_STATE+9],temp_state[id*DIM_STATE+10],temp_state[id*DIM_STATE+11],temp_state[id*DIM_STATE+12]);
+                // printf("in propagate. id = %d, num_step=%d, temp_state: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, num_step, temp_state[id*DIM_STATE+0],temp_state[id*DIM_STATE+1],temp_state[id*DIM_STATE+2],temp_state[id*DIM_STATE+3],temp_state[id*DIM_STATE+4],temp_state[id*DIM_STATE+5],temp_state[id*DIM_STATE+6],temp_state[id*DIM_STATE+7],temp_state[id*DIM_STATE+8],temp_state[id*DIM_STATE+9],temp_state[id*DIM_STATE+10],temp_state[id*DIM_STATE+11],temp_state[id*DIM_STATE+12]);
 
                 // enforce bounds
                 enforce_bounds(temp_state+id*DIM_STATE);
@@ -347,7 +347,7 @@ namespace trajectory_optimizers_quadrotor{
                 bool valid = valid_state(&temp_state[id*DIM_STATE], obs_min_max);
                 active_mask[id] = active_mask[id] && valid;
             }
-           // printf("%d, %d: %f, %f, %f, %f\n", ns, np, temp_state[id * DIM_STATE + STATE_X], temp_state[id * DIM_STATE + STATE_V], temp_state[id * DIM_STATE + STATE_THETA], temp_state[id * DIM_STATE + STATE_W]);
+        //    printf("%d, %d: %f, %f, %f, %f\n", ns, np, temp_state[id * DIM_STATE + 0], temp_state[id * DIM_STATE + 1], temp_state[id * DIM_STATE + 2], temp_state[id * DIM_STATE + 3]);
 
     }
 
@@ -405,18 +405,18 @@ namespace trajectory_optimizers_quadrotor{
         unsigned int np = blockIdx.x * blockDim.x + threadIdx.x;
         unsigned int ns = blockIdx.y * blockDim.y + threadIdx.y;
         unsigned int id = np * NS + ns;
-        //printf("in get_loss. id = %d,  goal_state: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, goal_state[np*DIM_STATE+0],goal_state[np*DIM_STATE+1],goal_state[np*DIM_STATE+2],goal_state[np*DIM_STATE+3],goal_state[np*DIM_STATE+4],goal_state[np*DIM_STATE+5],goal_state[np*DIM_STATE+6],goal_state[np*DIM_STATE+7],goal_state[np*DIM_STATE+8],goal_state[np*DIM_STATE+9],goal_state[np*DIM_STATE+10],goal_state[np*DIM_STATE+11],goal_state[np*DIM_STATE+12]);
-        //printf("in get_loss. id = %d, active_mask: %d, temp_state: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, active_mask[id], temp_state[id*DIM_STATE+0],temp_state[id*DIM_STATE+1],temp_state[id*DIM_STATE+2],temp_state[id*DIM_STATE+3],temp_state[id*DIM_STATE+4],temp_state[id*DIM_STATE+5],temp_state[id*DIM_STATE+6],temp_state[id*DIM_STATE+7],temp_state[id*DIM_STATE+8],temp_state[id*DIM_STATE+9],temp_state[id*DIM_STATE+10],temp_state[id*DIM_STATE+11],temp_state[id*DIM_STATE+12]);
+        // printf("in get_loss. id = %d,  goal_state: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, goal_state[np*DIM_STATE+0],goal_state[np*DIM_STATE+1],goal_state[np*DIM_STATE+2],goal_state[np*DIM_STATE+3],goal_state[np*DIM_STATE+4],goal_state[np*DIM_STATE+5],goal_state[np*DIM_STATE+6],goal_state[np*DIM_STATE+7],goal_state[np*DIM_STATE+8],goal_state[np*DIM_STATE+9],goal_state[np*DIM_STATE+10],goal_state[np*DIM_STATE+11],goal_state[np*DIM_STATE+12]);
+        // printf("in get_loss. id = %d, active_mask: %d, temp_state: (%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f)\n", id, active_mask[id], temp_state[id*DIM_STATE+0],temp_state[id*DIM_STATE+1],temp_state[id*DIM_STATE+2],temp_state[id*DIM_STATE+3],temp_state[id*DIM_STATE+4],temp_state[id*DIM_STATE+5],temp_state[id*DIM_STATE+6],temp_state[id*DIM_STATE+7],temp_state[id*DIM_STATE+8],temp_state[id*DIM_STATE+9],temp_state[id*DIM_STATE+10],temp_state[id*DIM_STATE+11],temp_state[id*DIM_STATE+12]);
 
         loss[id] = distance(temp_state+id * DIM_STATE, goal_state+np * DIM_STATE);
-        //printf("in get_loss. loss[%d]: %f\n", id, loss[id]);
+        // printf("in get_loss. loss[%d]: %f\n", id, loss[id]);
         if (!active_mask[id]) {
             loss[id] += OBS_PENALTY;
         }
-        /*printf("%d, %d: %f, %f, %f, %f, loss: %f\n", 
-            ns, np, 
-            temp_state[id * DIM_STATE + STATE_X], temp_state[id * DIM_STATE + STATE_V], temp_state[id * DIM_STATE + STATE_THETA], temp_state[id * DIM_STATE + STATE_W],
-            loss[id]);*/
+        // printf("%d, %d: %f, %f, %f, %f, loss: %f\n", 
+        //     ns, np, 
+        //     temp_state[id * DIM_STATE + 0], temp_state[id * DIM_STATE + 1], temp_state[id * DIM_STATE + 2], temp_state[id * DIM_STATE + 3],
+        //     loss[id]);
         
 
     }
@@ -480,11 +480,11 @@ namespace trajectory_optimizers_quadrotor{
         }
         double sum_time = 0., ss_time = 0.;
         for(int i = 0; i < N_ELITE; i++){
-            //printf("inside update_statistics. N_ELITE: %d\n", N_ELITE);
-            //printf("inside update_statistics. elite_i: %d\n", i);
+            // printf("inside update_statistics. N_ELITE: %d\n", N_ELITE);
+            // printf("inside update_statistics. elite_i: %d\n", i);
             unsigned int id = np * NS * NT + loss_ind[np * NS + i] * NT + nt;
-            //printf("inside update_statistics. loss_ind: %d\n", loss_ind[np * NS + i]);
-            //printf("inside update_statistics. id: %d\n", id);
+            // printf("inside update_statistics. loss_ind: %d\n", loss_ind[np * NS + i]);
+            // printf("inside update_statistics. id: %d\n", id);
             for (int ci = 0; ci < DIM_CONTROL; ci++)
             {
                 sum_control[s_id*DIM_CONTROL+ci] += control[id*DIM_CONTROL+ci];
@@ -523,7 +523,7 @@ namespace trajectory_optimizers_quadrotor{
         for (unsigned ci = 0; ci < DIM_CONTROL; ci++)
         {
             best_u[s_id*DIM_CONTROL+ci] = control[(np * NS * NT + loss_ind[np * NS] * NT + nt)*DIM_CONTROL+ci];
-            //printf("best_u[%d]=%f\n", s_id*DIM_CONTROL+ci, best_u[s_id*DIM_CONTROL+ci]);
+            // printf("best_u[%d]=%f\n", s_id*DIM_CONTROL+ci, best_u[s_id*DIM_CONTROL+ci]);
         }
 
         best_t[s_id] = time[np * NS * NT + loss_ind[np * NS] * NT + nt];

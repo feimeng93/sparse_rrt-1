@@ -64,7 +64,7 @@ namespace trajectory_optimizers_acrobot{
         unsigned int nt = blockIdx.z * blockDim.z + threadIdx.z;
         unsigned int id = np * NT + nt;
         //unsigned int id = blockIdx.x*blockDim.x + threadIdx.x;// 0~NT * NP
-        // printf("inside set_statistics. id: (%d, %d)\n", np, nt);
+        //printf("inside set_statistics. id: (%d, %d)\n", np, nt);
 
         d_mean_time[id] = mean_time;
         d_mean_control[id] = mean_control[0];
@@ -88,7 +88,7 @@ namespace trajectory_optimizers_acrobot{
         temp_state[STATE_THETA_2 + id*DIM_STATE] = start[STATE_THETA_2 + np * DIM_STATE];
         temp_state[STATE_V_1 + id*DIM_STATE] = start[STATE_V_1 + np * DIM_STATE];
         temp_state[STATE_V_2 + id*DIM_STATE] = start[STATE_V_2 + np * DIM_STATE]; 
-        //printf("%d: %f, %f, %f, %f\n", id, temp_state[id * DIM_STATE + STATE_X], temp_state[id * DIM_STATE + STATE_V], temp_state[id * DIM_STATE + STATE_THETA], temp_state[id * DIM_STATE + STATE_W]);
+        //printf("%d: %f, %f, %f, %f\n", id, temp_state[id * DIM_STATE + 0], temp_state[id * DIM_STATE + 1], temp_state[id * DIM_STATE + 2], temp_state[id * DIM_STATE + 3]);
 
     }
 
@@ -279,7 +279,7 @@ namespace trajectory_optimizers_acrobot{
                 bool valid = valid_state(&temp_state[id*DIM_STATE], obs_list);
                 active_mask[id] = active_mask[id] && valid;
             }        
-           // printf("%d, %d: %f, %f, %f, %f\n", ns, np, temp_state[id * DIM_STATE + STATE_X], temp_state[id * DIM_STATE + STATE_V], temp_state[id * DIM_STATE + STATE_THETA], temp_state[id * DIM_STATE + STATE_W]);
+            //printf("%d, %d: %f, %f, %f, %f\n", ns, np, temp_state[id * DIM_STATE + 0], temp_state[id * DIM_STATE + 1], temp_state[id * DIM_STATE + 2], temp_state[id * DIM_STATE + 3]);
 
     }
 
@@ -316,10 +316,10 @@ namespace trajectory_optimizers_acrobot{
         }
         //printf("loss[%d]: %f", id, loss[id]);
 
-        /*printf("%d, %d: %f, %f, %f, %f, loss: %f\n", 
-            ns, np, 
-            temp_state[id * DIM_STATE + STATE_X], temp_state[id * DIM_STATE + STATE_V], temp_state[id * DIM_STATE + STATE_THETA], temp_state[id * DIM_STATE + STATE_W],
-            loss[id]);*/
+        // printf("%d, %d: %f, %f, %f, %f, loss: %f\n", 
+        //     ns, np, 
+        //     temp_state[id * DIM_STATE + 0], temp_state[id * DIM_STATE + 1], temp_state[id * DIM_STATE + 2], temp_state[id * DIM_STATE + 3],
+        //     loss[id]);
 
     }
 
@@ -479,6 +479,12 @@ namespace trajectory_optimizers_acrobot{
         //printf("setup...\n");
         // best_ut = (double*) malloc(2 * NP * NT /*time + control*/ * sizeof(double));   // 2 x NP x NT
         cudaMalloc(&d_best_ut, NP * NT * 2 * sizeof(double)); 
+
+        cudaMalloc(&d_mu_u0, DIM_CONTROL * sizeof(double)); 
+        cudaMalloc(&d_std_u0, DIM_CONTROL * sizeof(double)); 
+        cudaMemcpy(d_mu_u0, mu_u0, DIM_CONTROL * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_std_u0, std_u0, DIM_CONTROL * sizeof(double), cudaMemcpyHostToDevice);
+
         // temp state, derivative, control, time samples
             // temp_state = (double*) malloc(NS * DIM_STATE * sizeof(double));
         cudaMalloc(&d_temp_state, NP * NS * DIM_STATE * sizeof(double)); 
@@ -564,13 +570,13 @@ namespace trajectory_optimizers_acrobot{
         //thrust::device_ptr<double> loss_ptr(d_loss);
         //thrust::device_ptr<int> loss_ind_ptr(d_loss_ind);
         //init mean
-        //printf("%f,%f,%f,%f\n", mu_t0, std_t0, mu_u0, std_u0);
+        //printf("%f,%f,%f,%f\n", mu_t0, std_t0, mu_u0[0], std_u0[0]);
         #ifdef PROFILE
 
         profile_start = std::chrono::high_resolution_clock::now();
         #endif
 
-        set_statistics<<<grid, block_pt>>>(d_mean_time, mu_t0, d_mean_control, mu_u0, d_std_control, std_u0, d_std_time, std_t0, NT);
+        set_statistics<<<grid, block_pt>>>(d_mean_time, mu_t0, d_mean_control, d_mu_u0, d_std_control, d_std_u0, d_std_time, std_t0, NT);
 
         #ifdef PROFILE
         profile_stop = std::chrono::high_resolution_clock::now();

@@ -128,30 +128,30 @@ add_library(CEMMPC SHARED
     ${MPC_SOURCE}
     )
 
-set(DEEP_SMP_MODULE
+set(MPC_MPNET_MODULE
     ${PLANNING_UTILS}
     src/motion_planners/sst.cpp
     src/networks/mpnet.cpp
     src/networks/mpnet_cost.cpp
-    src/motion_planners/deep_smp_mpc_sst.cpp
+    src/motion_planners/mpc_mpnet.cpp
 )
 
 
-add_library(deep_smp_module SHARED
-    ${PROJECT_SOURCE_DIR}/src/deep_smp_wrapper.cpp
-    ${DEEP_SMP_MODULE}
+add_library(mpc_mpnet_module SHARED
+    ${PROJECT_SOURCE_DIR}/src/mpc_mpnet_wrapper.cpp
+    ${MPC_MPNET_MODULE}
     )
-target_link_libraries(deep_smp_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
+target_link_libraries(mpc_mpnet_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
 
 # Don't prepend wrapper library name with lib and add to Python libs.
-set_target_properties(deep_smp_module PROPERTIES
+set_target_properties(mpc_mpnet_module PROPERTIES
         PREFIX "_"
         SUFFIX ".so"
         CXX_STANDARD 11
 
         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
         )
-set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
+set_property(TARGET mpc_mpnet_module PROPERTY CXX_STANDARD 11)
 
 
 # for all test
@@ -166,10 +166,10 @@ target_link_libraries(test_mpc CEMMPC)
 ### test planners
 add_executable(test_planner
     tests/motion_planners/test_planner.cpp
-    ${DEEP_SMP_MODULE}
+    ${MPC_MPNET_MODULE}
     )
 target_link_libraries(
-    test_planner   
+    test_planner  
     ${TORCH_LIBRARIES}
     CEMMPC
     )
@@ -179,7 +179,8 @@ set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
 add_executable(test_system
     src/systems/cart_pole_obs.cpp
     src/systems/two_link_acrobot_obs.cpp
-    src/systems/quadrotor_obs.cpp    tests/systems/test_system.cpp
+    src/systems/quadrotor_obs.cpp    
+    tests/systems/test_system.cpp
     )
 
 

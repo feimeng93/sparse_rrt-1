@@ -5,7 +5,7 @@
 
 #include "systems/distance_functions.h"
 
-#include "motion_planners/deep_smp_mpc_sst.hpp"
+#include "motion_planners/mpc_mpnet.hpp"
 
 #include "networks/mpnet.hpp"
 #include "networks/mpnet_cost.hpp"
@@ -52,7 +52,7 @@ int test_acrobot(){
         5, "cuda:0", 0.2, true);
     //  networks::mpnet_t mpnet(
     //     std::string("/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/exported/output/mpnet5000.pt"));
-    deep_smp_mpc_sst_t* planner;
+    mpc_mpnet_t* planner;
 
     double in_start[4] = {0, 0, 0, 0};
     double in_goal[4] = {3.14, 0, 0}; 
@@ -61,7 +61,7 @@ int test_acrobot(){
     torch::Tensor obs = torch::zeros({1,1,32,32}).to(at::kCUDA);
     torch::NoGradGuard no_grad;
 
-    planner = new deep_smp_mpc_sst_t(
+    planner = new mpc_mpnet_t(
         in_start, in_goal,
         in_radius,
         model->get_state_bounds(),
@@ -120,7 +120,7 @@ int test_quadrotor(){
         std::string(""),
         std::string(""),
         5, "cuda:0", 0.2, true);
-    deep_smp_mpc_sst_t* planner;
+    mpc_mpnet_t* planner;
 
     const double in_start[13] = {0, 0, 0, 
                                  0, 0, 0, 1,
@@ -137,7 +137,7 @@ int test_quadrotor(){
     torch::Tensor obs = torch::zeros({1,32,32,32}).to(at::kCUDA);
     torch::NoGradGuard no_grad;
 
-    planner = new deep_smp_mpc_sst_t(
+    planner = new mpc_mpnet_t(
         in_start, in_goal,
         in_radius,
         model->get_state_bounds(),

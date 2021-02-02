@@ -13,8 +13,8 @@
  */
 
 
-#ifndef DEEP_SMP_MPC_SST_HPP
-#define DEEP_SMP_MPC_SST_HPP
+#ifndef MPC_MPNET_HPP
+#define MPC_MPNET_HPP
 
 #include "systems/enhanced_system.hpp"
 // #include "systems/system.hpp"
@@ -34,8 +34,9 @@
 #include "networks/mpnet_cost.hpp"
 #endif
 
-#ifndef COST_PREDICTOR_HPP
-#include "networks/cost_predictor.hpp"
+
+#ifndef TORCH_H
+#include <torch/script.h>
 #endif
 
 #include <string>
@@ -43,7 +44,7 @@
  * @brief The motion planning algorithm SST (Stable Sparse-RRT)
  * @details The motion planning algorithm SST (Stable Sparse-RRT)
  */
-class deep_smp_mpc_sst_t : public planner_t
+class mpc_mpnet_t : public planner_t
 {
 public:
 	/**
@@ -60,7 +61,7 @@ public:
 	 * @param delta_near Near distance threshold for SST
 	 * @param delta_drain Drain distance threshold for SST
 	 */
-	deep_smp_mpc_sst_t(const double* in_start, const double* in_goal,
+	mpc_mpnet_t(const double* in_start, const double* in_goal,
 		double in_radius,
 		const std::vector<std::pair<double, double>>& a_state_bounds,
 		const std::vector<std::pair<double, double>>& a_control_bounds,
@@ -72,7 +73,7 @@ public:
 		int np,
 		int shm_max_step
 	);
-	virtual ~deep_smp_mpc_sst_t();
+	virtual ~mpc_mpnet_t();
 
 	/**
 	 * @copydoc planner_t::get_solution(std::vector<std::pair<double*,double> >&)
@@ -94,12 +95,9 @@ public:
 	 virtual void neural_step(enhanced_system_t* system, double integration_step, 
 	 	torch::Tensor& env_vox_tensor, bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection,
 		double* states, double goal_bias);
-	 virtual void neural_step_batch(enhanced_system_t* system, double integration_step, 
+	 virtual void mp_tree_step(enhanced_system_t* system, double integration_step, 
 	 	torch::Tensor& env_vox_tensor, bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection,
 		double* states, double goal_bias, const int NP);
-
-	 virtual void neural_step_single_batch(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
-    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, const int NP);
 
 	// Expose two functions public to enable the python wrappers to call 
 	/**
@@ -114,7 +112,8 @@ public:
 	 * @details If propagation was successful, add the new state to the tree.
 	 */
 	void add_to_tree(const double* sample_state, const double* sample_control, sst_node_t* nearest, double duration);
-	
+	void add_to_tree_batch(const double* sample_state, const double* sample_control, sst_node_t* nearest, double duration, std::vector<sst_node_t*> nearest_list);
+
 	/**
 	 * @brief Applies bvp or mpc or random to steer
 	 * @details Applies bvp or mpc or random to steer
@@ -135,16 +134,8 @@ public:
 		double* neural_sample_state, torch::Tensor& env_vox_tensor, bool refine, float refine_threshold,
 		bool using_one_step_cost, bool cost_reselection, const int NP);
 
-	virtual void deep_smp_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
+	virtual void mp_path_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
     	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias);
-
-	
-	virtual void deep_smp_step(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
-    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, int NP);
-
-	virtual void deep_smp_step_batch(enhanced_system_t* system, double integration_step, torch::Tensor& env_vox, 
-    	bool refine, float refine_threshold, bool using_one_step_cost, bool cost_reselection, double* states, double goal_bias, int NP);
-
 	
 	// double goal_bias;
 protected:
@@ -235,7 +226,7 @@ protected:
 	int shm_max_step;
 
 	int NP;
-
+	bool solved = false;
 	// double* start_state;
 };
 
