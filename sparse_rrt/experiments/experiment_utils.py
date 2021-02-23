@@ -1,7 +1,7 @@
 import numpy as np
 import time
 
-from sparse_rrt.planners import SST, RRT
+from sparse_rrt.planners import SST, RRT, SST_Backend
 from sparse_rrt.systems import create_standard_system
 from sparse_rrt.visualization import show_image
 
@@ -30,6 +30,18 @@ def run_config(config):
         system = config['system']
     if config['planner'] == 'sst':
         planner = SST(
+            state_bounds=system.get_state_bounds(),
+            control_bounds=system.get_control_bounds(),
+            distance=system.distance_computer(),
+            start_state=config['start_state'],
+            goal_state=config['goal_state'],
+            goal_radius=config['goal_radius'],
+            random_seed=config['random_seed'],
+            sst_delta_near=float(config['sst_delta_near']),
+            sst_delta_drain=float(config['sst_delta_drain'])
+        )
+    elif config['planner'] == 'sst_backend':
+        planner = SST_Backend(
             state_bounds=system.get_state_bounds(),
             control_bounds=system.get_control_bounds(),
             distance=system.distance_computer(),

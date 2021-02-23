@@ -42,3 +42,8 @@ cmake-build-debug
 .cache
 venv
 *.egg-info
+
+# dist
+dist
+
+**/.vscode

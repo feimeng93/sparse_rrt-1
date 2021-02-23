@@ -1,4 +1,6 @@
-
+import sys
+sys.path.append('/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/deps/sparse_rrt-1')
+sys.path.append('.')
 from sparse_rrt.experiments import standard_experiments
 from sparse_rrt.experiments.experiment_utils import run_config
 

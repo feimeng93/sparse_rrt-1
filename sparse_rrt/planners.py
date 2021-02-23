@@ -39,6 +39,11 @@ class SST(visualize_wrapper(_sst_module.SSTWrapper)):
     '''
     pass
 
+class SST_Backend(visualize_wrapper(_sst_module.SSTBackendWrapper)):
+    '''
+    Sparse stable trees planner
+    '''
+    pass
 
 class RRT(visualize_wrapper(_sst_module.RRTWrapper)):
     '''
