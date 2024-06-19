@@ -9,20 +9,21 @@
  *
  * Original authors: Zakary Littlefield, Kostas Bekris
  * Modifications by: Yinglong Miao
+ * Modifications by: Fei Meng
  *
  */
 
-#ifndef SPARSE_CAR_OBS_HPP
-#define SPARSE_CAR_OBS_HPP
+#ifndef SPARSE_PLANARQUAD_HPP
+#define SPARSE_PLANARQUAD_HPP
 
-#include "systems/enhanced_system.hpp"
+#include "systems/system.hpp"
 
-class car_obs_t : public enhanced_system_t
+class planarquad_t : public system_t
 {
 public:
-	car_obs_t(std::vector<std::vector<double>>& _obs_list, double width)
+	planarquad_t(std::vector<std::vector<double>>& _obs_list, double width)
 	{
-		state_dimension = 3;
+		state_dimension = 6;
 		control_dimension = 2;
 		temp_state = new double[state_dimension];
 		deriv = new double[state_dimension];
@@ -54,7 +55,7 @@ public:
             std::vector<double> obs_length;
             obs_length.push_back(sqrt(obs_axis_i[0][0]*obs_axis_i[0][0]+obs_axis_i[0][1]*obs_axis_i[0][1]));
             obs_length.push_back(sqrt(obs_axis_i[1][0]*obs_axis_i[1][0]+obs_axis_i[1][1]*obs_axis_i[1][1]));
-			// ormalize the axis
+			// normalize the axis
             for (unsigned i1=0; i1<2; i1++)
             {
                 for (unsigned j1=0; j1<2; j1++)
@@ -73,7 +74,7 @@ public:
         }
 		//std::cout << "after initialization" << std::endl;
 	}
-	virtual ~car_obs_t()
+	virtual ~planarquad_t()
 	{
 		delete temp_state;
 		delete deriv;
@@ -120,17 +121,7 @@ public:
 	 */
 	std::vector<bool> is_circular_topology() const override;
     
-	double get_loss(double* state, const double* goal, double* weight);
-    
-	/**
-	 * normalize state to [-1,1]^4
-	 */
-	void normalize(const double* state, double* normalized);
 
-	/**
-	 * denormalize state back 
-	 */ 
-	void denormalize(double* normalized,  double* state);
 	static double distance(const double* point1, const double* point2, unsigned int);
 
 	bool overlap(std::vector<std::vector<double>>& b1corner, std::vector<std::vector<double>>& b1axis,

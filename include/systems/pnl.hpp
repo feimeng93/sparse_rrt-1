@@ -12,8 +12,9 @@
  * 
  */
 
-#ifndef SPARSE_POINT_HPP
-#define SPARSE_POINT_HPP
+#ifndef SPARSE_PNL_HPP
+#define SPARSE_PNL_HPP
+
 
 #include "systems/system.hpp"
 
@@ -61,29 +62,32 @@ public:
  * @brief A simple system implementing a 2d point. 
  * @details A simple system implementing a 2d point. It's controls include velocity and direction.
  */
-class point_t : public system_t
+class pnl_t : public system_t
 {
 public:
-	point_t(int number_of_obstacles=5)
+	pnl_t(std::vector<std::vector<double>>& _obs_list, double width)
 	{
-		state_dimension = 2;
-		control_dimension = 2;
-		temp_state = new double[state_dimension];
+		state_dimension = 3;
+		control_dimension = 1;
+		validity = true;
+		temp_state = new double[state_dimension]();
+		deriv = new double[state_dimension]();
+		u = new double[control_dimension]();
 
-		std::vector<Rectangle_t> available_obstacles;
-		available_obstacles.push_back(Rectangle_t(   1,  -1.5,    5,  9.5));
-		available_obstacles.push_back(Rectangle_t(  -8,  4.25,   -1, 5.75));
-		available_obstacles.push_back(Rectangle_t(   5,   3.5,    9,  4.5));
-		available_obstacles.push_back(Rectangle_t(-8.5,  -7.5, -3.5, -2.5));
-		available_obstacles.push_back(Rectangle_t(   5,  -8.5,    9, -4.5));
-
-		for (int i =0; i<number_of_obstacles; i++) {
-		    obstacles.push_back(available_obstacles[i]);
+		// copy the items from _obs_list to obs_list
+		for(unsigned int oi = 0; oi < _obs_list.size(); oi++){
+			std::vector<double> min_max_i = {_obs_list.at(oi).at(0) - width / 2, _obs_list.at(oi).at(0) + width / 2,
+											 _obs_list.at(oi).at(1) - width / 2, _obs_list.at(oi).at(1) + width / 2,
+											 _obs_list.at(oi).at(2) - width / 2, _obs_list.at(oi).at(2) + width / 2};// size = 6
+			obs_min_max.push_back(min_max_i); // size = n_o (* 6)
 		}
 
 	}
-	virtual ~point_t(){ delete temp_state;}
-
+	virtual ~pnl_t(){ delete[] temp_state; delete[] deriv; delete[] u;} 
+	/**
+	 * @copydoc enhanced_system_t::distance(double*, double*)
+	 */
+	static double distance(const double* point1, const double* point2, unsigned int);
 	/**
 	 * @copydoc system_t::propagate(double*, double*, int, int, double*, double& )
 	 */
@@ -102,10 +106,11 @@ public:
 	 */
 	virtual bool valid_state() override;
 
+	std::tuple<double, double> visualize_point(const double* state, unsigned int state_dimension) const override;
 	/**
 	 * @copydoc system_t::visualize_point(double*, svg::Dimensions)
 	 */
-	std::tuple<double, double> visualize_point(const double* state, unsigned int state_dimension) const override;
+	std::tuple<double, double, double> visualize_3Dpoint(const double* state, unsigned int state_dimension) const;
 
 	/**
 	 * @copydoc system_t::visualize_obstacles(svg::DocumentBody&, svg::Dimensions)
@@ -122,15 +127,18 @@ public:
 	 */
     std::vector<std::pair<double, double>> get_control_bounds() const override;
 
-    /**
-	 * @copydoc system_t::is_circular_topology()
+	/**
+	 * @copydoc enhanced_system_t::is_circular_topology()
 	 */
     std::vector<bool> is_circular_topology() const override;
 
+	
 protected:
-
-	std::vector<Rectangle_t> obstacles;
-
+	double* deriv;
+	void update_derivative(const double* control);
+	double *u;
+	bool validity;
+	std::vector<std::vector<double>> obs_min_max;
 };
 
 

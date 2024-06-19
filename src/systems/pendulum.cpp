@@ -20,15 +20,16 @@
 
 #include <cmath>
 
-#define MIN_W -7
-#define MAX_W 7
+#define MIN_W -8
+#define MAX_W 8
 
-#define MIN_TORQUE -1
-#define MAX_TORQUE 1
+#define MIN_TORQUE -8
+#define MAX_TORQUE 8
 
-#define LENGTH 1
-#define MASS 1
-#define DAMPING .05
+#define LENGTH 1.0
+#define MASS 1.0
+#define DAMPING 1.0
+#define g 9.8
 
 
 bool pendulum_t::propagate(
@@ -36,16 +37,15 @@ bool pendulum_t::propagate(
     const double* control, unsigned int control_dimension,
     int num_steps, double* result_state, double integration_step)
 {
-	temp_state[0] = start_state[0]; temp_state[1] = start_state[1];
+	temp_state[0] = start_state[0]; 
+	temp_state[1] = start_state[1];
 	bool validity = true;
 	for(int i=0;i<num_steps;i++)
 	{
 		double temp0 = temp_state[0];
 		double temp1 = temp_state[1];
 		temp_state[0] += integration_step*temp1;
-		temp_state[1] += integration_step*
-							((control[0] - MASS * (9.81) * LENGTH * cos(temp0)*0.5 
-										 - DAMPING * temp1)* 3 / (MASS * LENGTH * LENGTH));
+		temp_state[1] += integration_step*(-g / LENGTH * sin(temp0)- DAMPING * LENGTH * temp1 / MASS + cos(temp0) * control[0] / (MASS * LENGTH));
 		enforce_bounds();
 		validity = validity && valid_state();
 	}
@@ -99,4 +99,13 @@ std::vector<bool> pendulum_t::is_circular_topology() const {
             true,
 			false
 	};
+}
+
+double pendulum_t::distance(const double* point1, const double* point2, unsigned int)
+{
+    double val = fabs(point1[0]-point2[0]);
+    if(val > M_PI)
+            val = 2*M_PI-val;
+    return std::sqrt(val * val + pow(point1[1]-point2[1], 2.0));
+
 }

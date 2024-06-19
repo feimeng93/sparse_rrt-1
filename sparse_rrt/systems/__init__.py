@@ -7,16 +7,14 @@ from sparse_rrt.systems.point import Point
 
 # List of standard systems that come out of the box
 _standard_system_classes = {
-    'car': standard_cpp_systems.Car,
-    'cart_pole': standard_cpp_systems.CartPole,
+    'cart_pole': standard_cpp_systems.RectangleObs2D,
+    'Linear2D': standard_cpp_systems.RectangleObs2D,
+    'Nonlinear3D': standard_cpp_systems.RectangleObs3D,
     'pendulum': standard_cpp_systems.Pendulum,
-    'point': standard_cpp_systems.Point,
-    'rally_car': standard_cpp_systems.RallyCar,
-    'two_link_acrobot': standard_cpp_systems.TwoLinkAcrobot,
-    'py_point': Point,
-    'py_car': Car,
+    'two_link_acrobot': standard_cpp_systems.RectangleObs2D,
     'py_pendulum': Pendulum,
-    'py_acrobot': Acrobot
+    'py_acrobot': standard_cpp_systems.RectangleObs2D,
+    'PlanarQuadrotor': standard_cpp_systems.RectangleObs2D
 }
 
 

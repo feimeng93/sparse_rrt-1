@@ -17,19 +17,59 @@
 
 
 #include "systems/system.hpp"
+#include <Eigen/Dense>
+#include <iostream>
+#include <vector>
+#include <tuple>
+#include <map>
+using Eigen::Matrix2d;
+using Eigen::Vector2d;
+using Eigen::Vector4d;
 
 class two_link_acrobot_t : public system_t
 {
 public:
-	two_link_acrobot_t()
+	two_link_acrobot_t(){
+		state_dimension = 4;
+		control_dimension = 1;
+		temp_state = new double[state_dimension];
+		deriv = new double[state_dimension];
+	}
+	two_link_acrobot_t(std::vector<std::vector<double>>& _obs_list, double width)
 	{
 		state_dimension = 4;
 		control_dimension = 1;
 		temp_state = new double[state_dimension];
 		deriv = new double[state_dimension];
-
+		// copy the items from _obs_list to obs_list
+		for(unsigned i=0; i<_obs_list.size(); i++)
+		{
+			// each obstacle is represented by its middle point
+			std::vector<double> obs(4*2);
+			// calculate the four points representing the rectangle in the order
+			// UL, UR, LR, LL
+			// the obstacle points are concatenated for efficient calculation
+			double x = _obs_list[i][0];
+			double y = _obs_list[i][1];
+			obs[0] = x - width / 2;  obs[1] = y + width / 2;
+			obs[2] = x + width / 2;  obs[3] = y + width / 2;
+			obs[4] = x + width / 2;  obs[5] = y - width / 2;
+			obs[6] = x - width / 2;  obs[7] = y - width / 2;
+			obs_list.push_back(obs);
+		}
+	
 	}
-	virtual ~two_link_acrobot_t(){}
+	virtual ~two_link_acrobot_t()
+	{
+		delete temp_state;
+	    delete deriv;
+		// clear the vector
+		obs_list.clear();
+	}
+
+	static Vector4d dynamics(const Vector4d &y, const Vector2d &u);
+
+	static void rk4_step(Vector4d &y, const Vector2d &u, const double integration_step);
 
 	/**
 	 * @copydoc system_t::distance(double*, double*)
@@ -73,11 +113,16 @@ public:
 	 * @copydoc system_t::is_circular_topology()
 	 */
     std::vector<bool> is_circular_topology() const override;
+/**
+	 * compute the error between to angles from -pi to pi and wrap the error back to 0~pi
+	 */
+	std::vector<std::vector<double>> obs_list;
+
 	
 protected:
 	double* deriv;
 	void update_derivative(const double* control);
-
+	bool lineLine(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4);
 };
 
 

@@ -28,9 +28,31 @@ public:
 		temp_state = new double[state_dimension];
 		deriv = new double[state_dimension];
 	}
+	cart_pole_t(std::vector<std::vector<double>> _obs_list, double width){
+		state_dimension = 4;
+		control_dimension = 1;
+		temp_state = new double[state_dimension]();
+		deriv = new double[state_dimension]();
+		u = new double[control_dimension]();
+		// copy the items from _obs_list to obs_list
+		for(unsigned int oi = 0; oi < _obs_list.size(); oi++){
+			std::vector<double> obs(4*2);
+			// calculate the four points representing the rectangle in the order
+			// UL, UR, LR, LL
+			// the obstacle points are concatenated for efficient calculation
+			double x = _obs_list[oi][0];
+			double y = _obs_list[oi][1];
+			obs[0] = x - width / 2;  obs[1] = y + width / 2;
+			obs[2] = x + width / 2;  obs[3] = y + width / 2;
+			obs[4] = x + width / 2;  obs[5] = y - width / 2;
+			obs[6] = x - width / 2;  obs[7] = y - width / 2;
+			obs_list.push_back(obs);
+		}
+	}
 	virtual ~cart_pole_t(){
-	    delete temp_state;
-	    delete deriv;
+	    delete[] temp_state;
+	    delete[] deriv;
+		obs_list.clear();
 	}
 
 	/**
@@ -71,9 +93,16 @@ public:
 	 */
     std::vector<bool> is_circular_topology() const override;
 
+	static double distance(const double* point1, const double* point2, unsigned int);
+	std::vector<std::vector<double>> obs_list;
+
+
+
 protected:
 	double* deriv;
 	void update_derivative(const double* control);
+	bool lineLine(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4);
+	double *u;
 };
 
 

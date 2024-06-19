@@ -65,6 +65,9 @@ public:
 	 * @copydoc system_t::is_circular_topology()
 	 */
     std::vector<bool> is_circular_topology() const override;
+
+	static double distance(const double* point1, const double* point2, unsigned int);
+
 };
 
 

@@ -97,7 +97,43 @@ public:
     double distance(const double* point1, const double* point2, unsigned int state_dimensions) const override;
 };
 
-class quadrotor_distance: public distance_t
+class planarquad_distance: public distance_t
+{
+public:
+	/**
+	 * @copydoc distance_t::distance()
+	 */
+    double distance(const double* point1, const double* point2, unsigned int state_dimensions) const override;
+};
+
+class pendulum_distance: public distance_t
+{
+public:
+	/**
+	 * @copydoc distance_t::distance()
+	 */
+    double distance(const double* point1, const double* point2, unsigned int state_dimensions) const override;
+};
+
+class cart_pole_distance: public distance_t
+{
+public:
+	/**
+	 * @copydoc distance_t::distance()
+	 */
+    double distance(const double* point1, const double* point2, unsigned int state_dimensions) const override;
+};
+
+class l_distance: public distance_t
+{
+public:
+	/**
+	 * @copydoc distance_t::distance()
+	 */
+    double distance(const double* point1, const double* point2, unsigned int state_dimensions) const override;
+};
+
+class pnl_distance: public distance_t
 {
 public:
 	/**

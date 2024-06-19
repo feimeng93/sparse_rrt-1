@@ -19,17 +19,15 @@
 #include <assert.h>
 #include <vector>
 
-#include "systems/point.hpp"
-#include "systems/car.hpp"
+#include "systems/l.hpp"
+#include "systems/pnl.hpp"
 #include "systems/cart_pole.hpp"
 #include "systems/pendulum.hpp"
-#include "systems/rally_car.hpp"
 #include "systems/two_link_acrobot.hpp"
-#include "systems/quadrotor.hpp"
+#include "systems/planarquad.hpp"
 
 
 #include "motion_planners/sst.hpp"
-#include "motion_planners/rrt.hpp"
 #include "motion_planners/sst_backend.hpp"
 
 #include "image_creation/planner_visualization.hpp"
@@ -434,77 +432,6 @@ private:
 };
 
 
-class __attribute__ ((visibility ("hidden"))) RRTWrapper : public PlannerWrapper{
-public:
-
-	/**
-	 * @brief Python wrapper of RRT planner constructor
-	 * @details Python wrapper of RRT planner constructor
-	 *
-	 * @param state_bounds_array numpy array (N x 2) with boundaries of the state space (min and max)
-	 * @param control_bounds_array numpy array (N x 2) with boundaries of the control space (min and max)
-	 * @param distance_computer_py Python wrapper of distance_t implementation
-	 * @param start_state_array The start state (numpy array)
-	 * @param goal_state_array The goal state  (numpy array)
-	 * @param goal_radius The radial size of the goal region centered at in_goal.
-	 * @param random_seed The seed for the random generator
-	 */
-    RRTWrapper(
-            const py::safe_array<double> &state_bounds_array,
-            const py::safe_array<double> &control_bounds_array,
-            py::object distance_computer_py,
-            const py::safe_array<double> &start_state_array,
-            const py::safe_array<double> &goal_state_array,
-            double goal_radius,
-            unsigned int random_seed
-    ) : _distance_computer_py(distance_computer_py)
-    {
-        if (state_bounds_array.shape()[0] != start_state_array.shape()[0]) {
-            throw std::runtime_error("State bounds and start state arrays have to be equal size");
-        }
-
-        if (state_bounds_array.shape()[0] != goal_state_array.shape()[0]) {
-            throw std::runtime_error("State bounds and goal state arrays have to be equal size");
-        }
-
-        auto state_bounds = state_bounds_array.unchecked<2>();
-        auto control_bounds = control_bounds_array.unchecked<2>();
-        auto start_state = start_state_array.unchecked<1>();
-        auto goal_state = goal_state_array.unchecked<1>();
-
-        typedef std::pair<double, double> bounds_t;
-        std::vector<bounds_t> state_bounds_v;
-        for (unsigned int i = 0; i < state_bounds_array.shape()[0]; i++) {
-            state_bounds_v.push_back(bounds_t(state_bounds(i, 0), state_bounds(i, 1)));
-        }
-
-        std::vector<bounds_t> control_bounds_v;
-        for (unsigned int i = 0; i < control_bounds_array.shape()[0]; i++) {
-            control_bounds_v.push_back(bounds_t(control_bounds(i, 0), control_bounds(i, 1)));
-        }
-
-        distance_t* distance_computer = distance_computer_py.cast<distance_t*>();
-        std::function<double(const double*, const double*, unsigned int)>  distance_f =
-            [distance_computer] (const double* p0, const double* p1, unsigned int dims) {
-                return distance_computer->distance(p0, p1, dims);
-            };
-
-        planner.reset(
-                new rrt_t(
-                        &start_state(0), &goal_state(0), goal_radius,
-                        state_bounds_v, control_bounds_v,
-                        distance_f,
-                        random_seed)
-        );
-    }
-private:
-
-	/**
-	 * @brief Captured distance computer python object to prevent its premature death
-	 */
-    py::object  _distance_computer_py;
-};
-
 
 /**
  * @brief Python trampoline for system_interface distance_t
@@ -601,31 +528,137 @@ public:
              const std::string &env_name
       )
      {
+        if (_obs_list.shape()[0] == 0) {
+             throw std::runtime_error("Should contain at least one obstacles.");
+        }
+        if (width <= 0.) {
+             throw std::runtime_error("obstacle width should be non-negative.");
+        }
+        if (_obs_list.shape()[1] != 3) {
+             throw std::runtime_error("Shape of the obstacle input should be (N,3).");
+        }
+        auto py_obs_list = _obs_list.unchecked<2>();
+        std::vector<std::vector<double>> obs_list(_obs_list.shape()[0], std::vector<double>(3, 0.0));
+        if (env_name=="Nonlinear3D"){
+            for (unsigned int i = 0; i < obs_list.size(); i++) {
+                obs_list[i][0] = py_obs_list(i, 0);
+                obs_list[i][1] = py_obs_list(i, 1);
+                obs_list[i][2] = py_obs_list(i, 2);
+            }
+         } else{
+            throw std::runtime_error("Invalid env_name");
+         }
+        system_obs.reset(
+        new pnl_t(obs_list, width)
+        );
+        state_dimension = 3;
+        control_dimension = 1;
+    }
+
+    bool propagate(
+             const double* start_state, unsigned int state_dimension,
+             const double* control, unsigned int control_dimension,
+     	    int num_steps, double* result_state, double integration_step)
+    {
+        return system_obs->propagate(start_state, state_dimension, control, control_dimension,
+                                    num_steps, result_state, integration_step);
+    }
+
+    void enforce_bounds()
+    {
+    //    system_obs->enforce_bounds();
+    }
+
+    bool valid_state()
+    {
+    //    return system_obs->valid_state();
+    }
+
+    std::tuple<double, double> visualize_point(const double* state, unsigned int state_dimension) const override
+    {
+        return system_obs->visualize_point(state, state_dimension);
+    }
+    std::vector<std::pair<double, double>> get_state_bounds() const override
+    {
+        return system_obs->get_state_bounds();
+    }
+    std::vector<std::pair<double, double>> get_control_bounds() const override
+    {
+        return system_obs->get_control_bounds();
+    }
+
+    std::vector<bool> is_circular_topology() const override
+    {
+        return system_obs->is_circular_topology();
+    }
+
+ protected:
+ 	/**
+ 	 * @brief Created planner object
+ 	 */
+     std::unique_ptr<system_t> system_obs;
+ };
+
+ class __attribute__ ((visibility ("hidden"))) RectangleObs2DWrapper : public system_t
+ {
+ public:
+
+ 	/**
+ 	 * @brief Python wrapper of RectangleObsWrapper constructor
+ 	 * @details Python wrapper of RectangleObsWrapper constructor
+ 	 *
+ 	 * @param _obs_list: numpy array (N x 2) representing the middle point of the obstacles
+     * @param width: width of the rectangle obstacle
+ 	 */
+     RectangleObs2DWrapper(
+             const py::safe_array<double> &_obs_list,
+             double width,
+             const std::string &env_name
+      )
+     {
          if (_obs_list.shape()[0] == 0) {
              throw std::runtime_error("Should contain at least one obstacles.");
-         }
-         if (_obs_list.shape()[1] != 3) {
-             throw std::runtime_error("Shape of the obstacle input should be (N,3).");
          }
          if (width <= 0.) {
              throw std::runtime_error("obstacle width should be non-negative.");
          }
-         auto py_obs_list = _obs_list.unchecked<2>();
-         // initialize the array
-         std::vector<std::vector<double>> obs_list(_obs_list.shape()[0], std::vector<double>(3, 0.0));
-         // copy from python array to this array
-         for (unsigned int i = 0; i < obs_list.size(); i++) {
-             obs_list[i][0] = py_obs_list(i, 0);
-             obs_list[i][1] = py_obs_list(i, 1);
-             obs_list[i][2] = py_obs_list(i, 2);
-
+         if (_obs_list.shape()[1] != 2) {
+             throw std::runtime_error("Shape of the obstacle input should be (N,2).");
+        }
+        auto py_obs_list = _obs_list.unchecked<2>();
+        std::vector<std::vector<double>> obs_list(_obs_list.shape()[0], std::vector<double>(2, 0.0));
+         if (env_name =="PlanarQuadrotor" || env_name =="Linear2D" || env_name =="CartPole-v1" || env_name =="TwoLinkRobot"){
+            for (unsigned int i = 0; i < obs_list.size(); i++) {
+                obs_list[i][0] = py_obs_list(i, 0);
+                obs_list[i][1] = py_obs_list(i, 1);
+            }
+         } else{
+            throw std::runtime_error("Invalid env_name");
          }
-         if (env_name =="quadrotor"){
+         if (env_name =="PlanarQuadrotor"){
              system_obs.reset(
-                new quadrotor_t(obs_list, width)
+                new planarquad_t(obs_list, width)
              );
-             state_dimension = 13;
-             control_dimension = 4;
+             state_dimension = 6;
+             control_dimension = 2;
+         } else if (env_name =="CartPole-v1"){
+             system_obs.reset(
+                new cart_pole_t(obs_list, width)
+             );
+             state_dimension = 4;
+             control_dimension = 1;
+         } else if (env_name =="TwoLinkRobot"){
+             system_obs.reset(
+                new two_link_acrobot_t(obs_list, width)
+             );
+             state_dimension = 4;
+             control_dimension = 2;
+         } else if (env_name =="Linear2D"){
+             system_obs.reset(
+                new l_t(obs_list, width)
+             );
+             state_dimension = 2;
+             control_dimension = 1;
          }
     }
 
@@ -686,8 +719,11 @@ PYBIND11_MODULE(_sst_module, m) {
    distance_interface_var
         .def(py::init<>());
    py::class_<euclidean_distance, distance_t>(m, "EuclideanDistance");
+   py::class_<l_distance, distance_t>(m, "LDistance").def(py::init<>());
+   py::class_<pnl_distance, distance_t>(m, "PNLDistance").def(py::init<>());
+   py::class_<cart_pole_distance, distance_t>(m, "CartpoleDistance").def(py::init<>());
    py::class_<two_link_acrobot_distance, distance_t>(m, "TwoLinkAcrobotDistance").def(py::init<>());
-   py::class_<quadrotor_distance, distance_t>(m, "QuadrotorDistance").def(py::init<>());
+   py::class_<planarquad_distance, distance_t>(m, "QuadrotorDistance").def(py::init<>());
 
    m.def("euclidean_distance", &create_euclidean_distance, "is_circular_topology"_a.noconvert());
 
@@ -705,20 +741,23 @@ PYBIND11_MODULE(_sst_module, m) {
         .def("get_control_bounds", &system_t::get_control_bounds)
         .def("is_circular_topology", &system_t::is_circular_topology)
    ;
-   py::class_<car_t>(m, "Car", system).def(py::init<>());
-   py::class_<cart_pole_t>(m, "CartPole", system).def(py::init<>());
+//    py::class_<car_t>(m, "Car", system).def(py::init<>());
+//    py::class_<cart_pole_t>(m, "CartPole", system).def(py::init<>());
    py::class_<pendulum_t>(m, "Pendulum", system).def(py::init<>());
-   py::class_<point_t>(m, "Point", system)
-       .def(py::init<int>(),
-            "number_of_obstacles"_a=5
-       );
-   py::class_<rally_car_t>(m, "RallyCar", system).def(py::init<>());
-   py::class_<two_link_acrobot_t>(m, "TwoLinkAcrobot", system).def(py::init<>());
-   py::class_<quadrotor_t>(m, "Quadrotor", system).def(py::init<>());
+//    py::class_<two_link_acrobot_t>(m, "TwoLinkAcrobot", system).def(py::init<>());
+//    py::class_<quadrotor_t>(m, "Quadrotor", system).def(py::init<>());
    /**
     * Universal system interface for obs based envs
     */
    py::class_<RectangleObs3DWrapper>(m, "RectangleObs3DSystem", system)
+        .def(py::init<const py::safe_array<double> &,
+                      double,
+                      const std::string &>(),
+            "obstacle_list"_a,
+            "obstacle_width"_a,
+            "env_name"_a
+        );
+    py::class_<RectangleObs2DWrapper>(m, "RectangleObs2DSystem", system)
         .def(py::init<const py::safe_array<double> &,
                       double,
                       const std::string &>(),
@@ -750,23 +789,6 @@ PYBIND11_MODULE(_sst_module, m) {
         .def("get_number_of_nodes", &PlannerWrapper::get_number_of_nodes)
    ;
 
-   py::class_<RRTWrapper>(m, "RRTWrapper", planner)
-        .def(py::init<const py::safe_array<double>&,
-                      const py::safe_array<double>&,
-                      py::object,
-                      const py::safe_array<double>&,
-                      const py::safe_array<double>&,
-                      double,
-                      unsigned int>(),
-            "state_bounds"_a,
-            "control_bounds"_a,
-            "distance"_a,
-            "start_state"_a,
-            "goal_state"_a,
-            "goal_radius"_a,
-            "random_seed"_a
-        )
-    ;
 
    py::class_<SSTWrapper>(m, "SSTWrapper", planner)
         .def(py::init<const py::safe_array<double>&,

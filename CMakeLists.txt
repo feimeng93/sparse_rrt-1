@@ -6,29 +6,29 @@ project(SparseRRT LANGUAGES CXX CUDA)
 # appending torch and cuda settings
 set (CMAKE_CUDA_FLAGS "-std=c++11")  # this line is important to compile CUDA with CXX in gcc-5
 list(APPEND CMAKE_PREFIX_PATH
-    /media/arclabdl1/HD1/Linjun/external/libtorch
+    # /media/arclabdl1/HD1/Linjun/external/libtorch
     /usr/local/cuda
     )
-set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
-find_package(Torch REQUIRED)
-find_package(CUDA QUIET REQUIRED)
+# set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
+# find_package(Torch REQUIRED)
+# find_package(CUDA QUIET REQUIRED)
 
 
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
-set(CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS}")
+# set(CMAKE_CXX_FLAGS "-std=c++1y ${CMAKE_CXX_FLAGS}")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(CMAKE_CXX_STANDARD 11)
- 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 set(INCLUDE_DIRECTORIES include)
 
 add_definitions(-O3)
 # SET(CMAKE_BUILD_TYPE "Debug")
 #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
 #SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
-
+find_package(Eigen3 3.3 REQUIRED)
 
 IF(APPLE)
    set(CMAKE_MACOSX_RPATH 1)
@@ -61,7 +61,8 @@ include_directories(
     "${PROJECT_SOURCE_DIR}/include"
     "${PROJECT_SOURCE_DIR}/deps/pybind11/include"
     # #torch
-    ${TORCH_INCLUDE_DIRS}
+    # ${TORCH_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIR}
     )
 
 set(PLANNING_UTILS
@@ -76,16 +77,14 @@ set(PLANNING_UTILS
 
 # for SST
 set(SOURCE_FILES
-    src/motion_planners/rrt.cpp
     src/motion_planners/sst.cpp
     src/motion_planners/sst_backend.cpp
-    src/systems/car.cpp
+    src/systems/l.cpp
+    src/systems/pnl.cpp
     src/systems/cart_pole.cpp
     src/systems/pendulum.cpp
-    src/systems/point.cpp
-    src/systems/rally_car.cpp
     src/systems/two_link_acrobot.cpp
-    src/systems/quadrotor.cpp
+    src/systems/planarquad.cpp
     src/systems/distance_functions.cpp
     ${PLANNING_UTILS}
 )
@@ -95,7 +94,7 @@ add_library(${PROJECT_NAME} STATIC
 
 add_library(sst_module SHARED
     ${PROJECT_SOURCE_DIR}/src/python_wrapper.cpp)
-target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME})
+target_link_libraries(sst_module ${PYTHON_LIBRARIES} ${PROJECT_NAME} )
 
 # Don't prepend wrapper library name with lib and add to Python libs.
 set_target_properties(sst_module PROPERTIES
@@ -108,72 +107,72 @@ set_property(TARGET sst_module PROPERTY CXX_STANDARD 11)
 #set_source_files_properties(src/trajectory_optimizers/cem_cuda.cu PROPERTIES LANGUAGE CUDA)
 
 # for mpc and cem
-set(MPC_SOURCE
-    src/systems/cart_pole_obs.cpp
-    src/systems/two_link_acrobot_obs.cpp
-    src/systems/quadrotor_obs.cpp
-    src/systems/car_obs.cpp
-    src/trajectory_optimizers/cem.cpp
+# set(MPC_SOURCE
+#     src/systems/cart_pole_obs.cpp
+#     src/systems/two_link_acrobot_obs.cpp
+#     src/systems/quadrotor_obs.cpp
+#     src/systems/car_obs.cpp
+#     src/trajectory_optimizers/cem.cpp
 
-    src/trajectory_optimizers/cem_cuda_cartpole.cu
-    src/trajectory_optimizers/cem_cuda_acrobot.cu
-    src/trajectory_optimizers/cem_cuda_car.cu
-    src/trajectory_optimizers/cem_cuda_quadrotor.cu
+#     src/trajectory_optimizers/cem_cuda_cartpole.cu
+#     src/trajectory_optimizers/cem_cuda_acrobot.cu
+#     src/trajectory_optimizers/cem_cuda_car.cu
+#     src/trajectory_optimizers/cem_cuda_quadrotor.cu
 
-    )
+#     )
 
-# set_property(TARGET CEMMPC PROPERTY CXX_STANDARD 11)
+# # set_property(TARGET CEMMPC PROPERTY CXX_STANDARD 11)
 
-add_library(CEMMPC SHARED
-    ${MPC_SOURCE}
-    )
+# add_library(CEMMPC SHARED
+#     ${MPC_SOURCE}
+#     )
 
-set(DEEP_SMP_MODULE
-    ${PLANNING_UTILS}
-    src/motion_planners/sst.cpp
-    src/networks/mpnet.cpp
-    src/networks/mpnet_cost.cpp
-    src/motion_planners/deep_smp_mpc_sst.cpp
-)
-
-
-add_library(deep_smp_module SHARED
-    ${PROJECT_SOURCE_DIR}/src/deep_smp_wrapper.cpp
-    ${DEEP_SMP_MODULE}
-    )
-target_link_libraries(deep_smp_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
-
-# Don't prepend wrapper library name with lib and add to Python libs.
-set_target_properties(deep_smp_module PROPERTIES
-        PREFIX "_"
-        SUFFIX ".so"
-        CXX_STANDARD 11
-
-        LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
-        )
-set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
+# set(DEEP_SMP_MODULE
+#     ${PLANNING_UTILS}
+#     src/motion_planners/sst.cpp
+#     src/networks/mpnet.cpp
+#     src/networks/mpnet_cost.cpp
+#     src/motion_planners/deep_smp_mpc_sst.cpp
+# )
 
 
-# for all test
-### test trajectory optimizers MPC
-add_executable(
-    test_mpc
-    tests/trajectory_optimizers/test_mpc.cpp
-    )
-target_link_libraries(test_mpc CEMMPC)
+# add_library(deep_smp_module SHARED
+#     ${PROJECT_SOURCE_DIR}/src/deep_smp_wrapper.cpp
+#     ${DEEP_SMP_MODULE}
+#     )
+# target_link_libraries(deep_smp_module ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES} CEMMPC)
+
+# # Don't prepend wrapper library name with lib and add to Python libs.
+# set_target_properties(deep_smp_module PROPERTIES
+#         PREFIX "_"
+#         SUFFIX ".so"
+#         CXX_STANDARD 11
+
+#         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/sparse_rrt
+#         )
+# set_property(TARGET deep_smp_module PROPERTY CXX_STANDARD 11)
 
 
-### test planners
-add_executable(test_planner
-    tests/motion_planners/test_planner.cpp
-    ${DEEP_SMP_MODULE}
-    )
-target_link_libraries(
-    test_planner   
-    ${TORCH_LIBRARIES}
-    CEMMPC
-    )
-set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
+# # for all test
+# ### test trajectory optimizers MPC
+# add_executable(
+#     test_mpc
+#     tests/trajectory_optimizers/test_mpc.cpp
+#     )
+# target_link_libraries(test_mpc CEMMPC)
+
+
+# ### test planners
+# add_executable(test_planner
+#     tests/motion_planners/test_planner.cpp
+#     ${DEEP_SMP_MODULE}
+#     )
+# target_link_libraries(
+#     test_planner   
+#     ${TORCH_LIBRARIES}
+#     CEMMPC
+#     )
+# set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
 
 ### test system
 add_executable(test_system

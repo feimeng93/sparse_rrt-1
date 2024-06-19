@@ -12,7 +12,7 @@
  *
  */
 
-#include "systems/car_obs.hpp"
+#include "systems/planarquad.hpp"
 #include "utilities/random.hpp"
 
 #define WIDTH 2.0
@@ -30,7 +30,7 @@
 #include <cmath>
 
 
-bool car_obs_t::propagate(
+bool planarquad_t::propagate(
     const double* start_state, unsigned int state_dimension,
     const double* control, unsigned int control_dimension,
     int num_steps, double* result_state, double integration_step)
@@ -54,7 +54,7 @@ bool car_obs_t::propagate(
 	return validity;
 }
 
-void car_obs_t::update_derivative(const double* control)
+void planarquad_t::update_derivative(const double* control)
 {
     deriv[0] = cos(temp_state[2]) * control[0];
     deriv[1] = -sin(temp_state[2]) * control[0];
@@ -62,7 +62,7 @@ void car_obs_t::update_derivative(const double* control)
 }
 
 
-void car_obs_t::enforce_bounds()
+void planarquad_t::enforce_bounds()
 {
     /*
 	if(temp_state[0]<-10)
@@ -81,7 +81,7 @@ void car_obs_t::enforce_bounds()
 		temp_state[2]-=2*M_PI;
 }
 
-bool car_obs_t::overlap(std::vector<std::vector<double>>& b1corner, std::vector<std::vector<double>>& b1axis,
+bool planarquad_t::overlap(std::vector<std::vector<double>>& b1corner, std::vector<std::vector<double>>& b1axis,
                         std::vector<double>& b1orign, std::vector<double>& b1ds,
                         std::vector<std::vector<double>>& b2corner, std::vector<std::vector<double>>& b2axis,
                         std::vector<double>& b2orign, std::vector<double>& b2ds)
@@ -112,7 +112,7 @@ bool car_obs_t::overlap(std::vector<std::vector<double>>& b1corner, std::vector<
 
 }
 
-bool car_obs_t::valid_state()
+bool planarquad_t::valid_state()
 {
     if (temp_state[0] < MIN_X || temp_state[0] > MAX_X || temp_state[1] < MIN_Y || temp_state[1] > MAX_Y)
     {
@@ -182,14 +182,14 @@ bool car_obs_t::valid_state()
 
 }
 
-std::tuple<double, double> car_obs_t::visualize_point(const double* state, unsigned int state_dimension) const
+std::tuple<double, double> planarquad_t::visualize_point(const double* state, unsigned int state_dimension) const
 {
 	double x = (state[0]+10)/(20);
 	double y = (state[1]+10)/(20);
 	return std::make_tuple(x, y);
 }
 
-std::vector<std::pair<double, double> > car_obs_t::get_state_bounds() const {
+std::vector<std::pair<double, double> > planarquad_t::get_state_bounds() const {
 	return {
         {MIN_X,MAX_X},
         {MIN_Y,MAX_Y},
@@ -198,14 +198,14 @@ std::vector<std::pair<double, double> > car_obs_t::get_state_bounds() const {
 }
 
 
-std::vector<std::pair<double, double> > car_obs_t::get_control_bounds() const {
+std::vector<std::pair<double, double> > planarquad_t::get_control_bounds() const {
     return {
             {0, 2},
             {-.5,.5},
     };
 }
 
-std::vector<bool> car_obs_t::is_circular_topology() const {
+std::vector<bool> planarquad_t::is_circular_topology() const {
 	return {
 			false,
 			false,
@@ -214,18 +214,7 @@ std::vector<bool> car_obs_t::is_circular_topology() const {
 }
 
 
-void car_obs_t::normalize(const double* state, double* normalized){
-    normalized[STATE_X] = state[STATE_X] / MAX_X;
-    normalized[STATE_Y] = state[STATE_Y] /MAX_Y;
-    normalized[STATE_THETA] = state[STATE_THETA] / M_PI;
-}
-
-void car_obs_t::denormalize(double* normalized, double* state){
-    state[STATE_X] = normalized[STATE_X] * MAX_X;
-    state[STATE_Y] = normalized[STATE_Y] * MAX_Y;
-    state[STATE_THETA] = normalized[STATE_THETA] * M_PI;
-}
-double car_obs_t::distance(const double* point1, const double* point2, unsigned int state_dimensions){
+double planarquad_t::distance(const double* point1, const double* point2, unsigned int state_dimensions){
     double result = 0;
     for (unsigned int i=0; i<state_dimensions; ++i) {
         if (i == 2) {
@@ -238,13 +227,4 @@ double car_obs_t::distance(const double* point1, const double* point2, unsigned 
         }
     }
     return std::sqrt(result);
-};
-
-double car_obs_t::get_loss(double* state, const double* goal, double* weight){
-    // return angular_error(state[2], goal[2]) * weight[2] + 
-    //     abs(state[0] - goal[0]) * weight[0] + abs(state[1] - goal[1]) * weight[1] + abs(state[3] - goal[3]) * weight[3];
-    double val = fabs(state[STATE_THETA]-goal[STATE_THETA]);
-    if(val > M_PI)
-            val = 2*M_PI-val;
-    return std::sqrt(val * val * weight[STATE_THETA] + pow(state[STATE_X]-goal[STATE_X], 2.0) * weight[STATE_X]+ pow(state[STATE_Y]-goal[STATE_Y], 2.0)* weight[STATE_Y]);
 }

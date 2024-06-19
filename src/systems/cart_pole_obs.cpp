@@ -219,7 +219,7 @@ std::vector<std::pair<double, double> > cart_pole_obs_t::get_state_bounds() cons
 
 std::vector<std::pair<double, double> > cart_pole_obs_t::get_control_bounds() const {
     return {
-            {-300,300},
+            {-10,10},
     };
 }
 
