@@ -19,12 +19,13 @@
 #include <assert.h>
 #include <vector>
 
+#include "systems/point.hpp"
 #include "systems/l.hpp"
 #include "systems/pnl.hpp"
 #include "systems/cart_pole.hpp"
 #include "systems/pendulum.hpp"
 #include "systems/two_link_acrobot.hpp"
-#include "systems/planarquad.hpp"
+#include "systems/planarquadrotor.hpp"
 
 
 #include "motion_planners/sst.hpp"
@@ -186,6 +187,10 @@ public:
         return std::move(document_body);
     }
 
+    // std::string visualize_obs_points_wrapper(){
+    //     std::vector<std::vector<std::vector<double>>> obs_list_points;
+    // }
+
     /**
 	 * @copydoc planner_t::get_solution()
 	 */
@@ -200,7 +205,7 @@ public:
         }
 
         py::safe_array<double> controls_array({controls.size(), controls[0].size()});
-        py::safe_array<double> costs_array({costs.size()});
+        py::safe_array<double> costs_array(costs.size());
         auto controls_ref = controls_array.mutable_unchecked<2>();
         auto costs_ref = costs_array.mutable_unchecked<1>();
         for (unsigned int i = 0; i < controls.size(); ++i) {
@@ -219,6 +224,34 @@ public:
         }
         return py::cast(std::tuple<py::safe_array<double>, py::safe_array<double>, py::safe_array<double>>
             (state_array, controls_array, costs_array));
+    }
+
+    py::object get_samples() {
+        std::vector<tree_node_t*> sorted_nodes;
+        double max_cost = 0;
+        get_max_cost(planner->get_root(), max_cost, sorted_nodes);
+        sort(sorted_nodes);
+
+        double state_dimension = planner->get_state_dimension();
+        // py::safe_array<double> nodes_array({sorted_nodes.size(), int(state_dimension)});
+        py::safe_array<double> nodes_array({static_cast<ptrdiff_t>(sorted_nodes.size()), static_cast<ptrdiff_t>(state_dimension)});
+        auto nodes_ref = nodes_array.mutable_unchecked<2>();
+        for (int i = static_cast<int>(sorted_nodes.size()) - 1; i >= 0; i--) {
+            for (unsigned int j = 0; j < state_dimension; ++j) {
+                nodes_ref(i, j) = sorted_nodes[i]->get_point()[j];
+            }
+        }
+        py::safe_array<double> nodes_costs_array({static_cast<ptrdiff_t>(sorted_nodes.size()), static_cast<ptrdiff_t>(state_dimension)});
+        auto nodes_costs_ref = nodes_costs_array.mutable_unchecked<2>();
+        for (int i = static_cast<int>(sorted_nodes.size()) - 1; i >= 0; i--) {
+            for (unsigned int j = 0; j < state_dimension; ++j) {
+                nodes_costs_ref(i, j) = sorted_nodes[i]->get_cost()/max_cost;
+            }
+        }
+
+
+        return py::cast(std::tuple<py::safe_array<double>, py::safe_array<double>>
+            (nodes_array, nodes_costs_array));
     }
 
     /**
@@ -553,6 +586,7 @@ public:
         );
         state_dimension = 3;
         control_dimension = 1;
+        distance_computer = cart_pole_t::distance;
     }
 
     bool propagate(
@@ -578,6 +612,12 @@ public:
     {
         return system_obs->visualize_point(state, state_dimension);
     }
+
+    std::string visualize_obstacles(int image_width, int image_height) const override{
+        return system_obs->visualize_obstacles(image_width, image_height);
+    }
+
+
     std::vector<std::pair<double, double>> get_state_bounds() const override
     {
         return system_obs->get_state_bounds();
@@ -597,6 +637,8 @@ public:
  	 * @brief Created planner object
  	 */
      std::unique_ptr<system_t> system_obs;
+    std::function<double(const double*, const double*, unsigned int)> distance_computer;
+
  };
 
  class __attribute__ ((visibility ("hidden"))) RectangleObs2DWrapper : public system_t
@@ -627,7 +669,7 @@ public:
         }
         auto py_obs_list = _obs_list.unchecked<2>();
         std::vector<std::vector<double>> obs_list(_obs_list.shape()[0], std::vector<double>(2, 0.0));
-         if (env_name =="PlanarQuadrotor" || env_name =="Linear2D" || env_name =="CartPole-v1" || env_name =="TwoLinkRobot"){
+         if (env_name =="PlanarQuadrotor" || env_name =="Linear2D" || env_name =="CartPole" || env_name =="TwoLinkRobot"){
             for (unsigned int i = 0; i < obs_list.size(); i++) {
                 obs_list[i][0] = py_obs_list(i, 0);
                 obs_list[i][1] = py_obs_list(i, 1);
@@ -637,28 +679,33 @@ public:
          }
          if (env_name =="PlanarQuadrotor"){
              system_obs.reset(
-                new planarquad_t(obs_list, width)
+                new planar_quadrotor_t(obs_list, width)
              );
              state_dimension = 6;
              control_dimension = 2;
-         } else if (env_name =="CartPole-v1"){
+            distance_computer = planar_quadrotor_t::distance;
+         } else if (env_name =="CartPole"){
              system_obs.reset(
                 new cart_pole_t(obs_list, width)
              );
              state_dimension = 4;
              control_dimension = 1;
+            distance_computer = cart_pole_t::distance;
          } else if (env_name =="TwoLinkRobot"){
              system_obs.reset(
                 new two_link_acrobot_t(obs_list, width)
              );
              state_dimension = 4;
              control_dimension = 2;
+            distance_computer = two_link_acrobot_t::distance;
          } else if (env_name =="Linear2D"){
              system_obs.reset(
                 new l_t(obs_list, width)
              );
              state_dimension = 2;
              control_dimension = 1;
+            distance_computer = l_t::distance;
+
          }
     }
 
@@ -685,6 +732,12 @@ public:
     {
         return system_obs->visualize_point(state, state_dimension);
     }
+
+    std::string visualize_obstacles(int image_width, int image_height) const override{
+        return system_obs->visualize_obstacles(image_width, image_height);
+    }
+
+
     std::vector<std::pair<double, double>> get_state_bounds() const override
     {
         return system_obs->get_state_bounds();
@@ -704,6 +757,9 @@ public:
  	 * @brief Created planner object
  	 */
      std::unique_ptr<system_t> system_obs;
+    std::function<double(const double*, const double*, unsigned int)> distance_computer;
+    
+
  };
 
 /**
@@ -719,6 +775,7 @@ PYBIND11_MODULE(_sst_module, m) {
    distance_interface_var
         .def(py::init<>());
    py::class_<euclidean_distance, distance_t>(m, "EuclideanDistance");
+   py::class_<pendulum_distance, distance_t>(m, "PendulumDistance").def(py::init<>());
    py::class_<l_distance, distance_t>(m, "LDistance").def(py::init<>());
    py::class_<pnl_distance, distance_t>(m, "PNLDistance").def(py::init<>());
    py::class_<cart_pole_distance, distance_t>(m, "CartpoleDistance").def(py::init<>());
@@ -742,10 +799,14 @@ PYBIND11_MODULE(_sst_module, m) {
         .def("is_circular_topology", &system_t::is_circular_topology)
    ;
 //    py::class_<car_t>(m, "Car", system).def(py::init<>());
-//    py::class_<cart_pole_t>(m, "CartPole", system).def(py::init<>());
-   py::class_<pendulum_t>(m, "Pendulum", system).def(py::init<>());
+//    py::class_<point_t>(m, "Point", system).def(py::init<>());
+      py::class_<pendulum_t>(m, "Pendulum", system).def(py::init<>());
 //    py::class_<two_link_acrobot_t>(m, "TwoLinkAcrobot", system).def(py::init<>());
 //    py::class_<quadrotor_t>(m, "Quadrotor", system).def(py::init<>());
+        py::class_<point_t>(m, "Point", system)
+       .def(py::init<int>(),
+            "number_of_obstacles"_a=5
+       );
    /**
     * Universal system interface for obs based envs
     */
@@ -766,6 +827,7 @@ PYBIND11_MODULE(_sst_module, m) {
             "env_name"_a
         );
    /* RectangleObsSys ends here*/
+
    // Classes and interfaces for planners
    py::class_<PlannerWrapper> planner(m, "PlannerWrapper");
    planner
@@ -782,10 +844,11 @@ PYBIND11_MODULE(_sst_module, m) {
             "system"_a,
             "image_width"_a=500,
             "image_height"_a=500,
-            "node_diameter"_a=5,
-            "solution_node_diameter"_a=4
+            "node_diameter"_a=3,
+            "solution_node_diameter"_a=6
             )
         .def("get_solution", &PlannerWrapper::get_solution)
+        .def("get_samples", &PlannerWrapper::get_samples)
         .def("get_number_of_nodes", &PlannerWrapper::get_number_of_nodes)
    ;
 

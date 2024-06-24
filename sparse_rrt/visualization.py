@@ -1,6 +1,7 @@
 
 import time
 import numpy as np
+import PySide6
 
 
 def svg_header(width, height):
@@ -105,7 +106,7 @@ def render_svg(svg_string):
         try:
             start_time = time.time()
             result = c(svg_string)
-            print('Took %s to convert' % (time.time() - start_time,))
+            # print('Took %s to convert' % (time.time() - start_time,))
             return result
         except:
             import traceback
@@ -170,26 +171,27 @@ def show_image_pyside(image, name, wait=False):
     :param name: name of the window
     :param wait: whether to block for user input
     '''
-    from PySide import QtGui
     import time
+    from PySide6 import QtWidgets, QtGui, QtCore
+    
     global _pyside_app, _pyside_label
+    if '_pyside_app' not in globals():
+        _pyside_app = QtWidgets.QApplication([name])
+        _pyside_label = QtWidgets.QLabel()
 
-    if _pyside_app is None:
-        _pyside_app = QtGui.QApplication([name])
-        _pyside_label = QtGui.QLabel()
-
-    imgQT = QtGui.QImage(image, image.shape[1], image.shape[0], QtGui.QImage.Format_ARGB32)
+    imgQT = QtGui.QImage(image.data, image.shape[1], image.shape[0], QtGui.QImage.Format_RGB888)
     pixMap = QtGui.QPixmap.fromImage(imgQT)
-
+    
     _pyside_label.setPixmap(pixMap)
     _pyside_label.show()
-
+    
     if wait:
-        while True:
+        while _pyside_label.isVisible():
             _pyside_app.processEvents()
             time.sleep(0.1)
     else:
         _pyside_app.processEvents()
+
 
 
 def show_image(image, name, wait=False):

@@ -79,6 +79,7 @@ set(PLANNING_UTILS
 set(SOURCE_FILES
     src/motion_planners/sst.cpp
     src/motion_planners/sst_backend.cpp
+    src/systems/point.cpp
     src/systems/l.cpp
     src/systems/pnl.cpp
     src/systems/cart_pole.cpp
@@ -175,11 +176,11 @@ set_property(TARGET sst_module PROPERTY CXX_STANDARD 11)
 # set_property(TARGET test_planner PROPERTY CXX_STANDARD 14)
 
 ### test system
-add_executable(test_system
-    src/systems/cart_pole_obs.cpp
-    src/systems/two_link_acrobot_obs.cpp
-    src/systems/quadrotor_obs.cpp    tests/systems/test_system.cpp
-    )
+# add_executable(test_system
+#     src/systems/cart_pole_obs.cpp
+#     src/systems/two_link_acrobot_obs.cpp
+#     src/systems/quadrotor_obs.cpp    tests/systems/test_system.cpp
+#     )
 
 
 

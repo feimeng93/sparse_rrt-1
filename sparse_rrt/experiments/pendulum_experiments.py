@@ -3,7 +3,7 @@ from sparse_rrt.experiments.experiment_utils import run_config
 # experiments with single-joint Pendulum
 base_pendulum_config = dict(
     start_state=[0., 0.],
-    goal_state=[1.57, 0.],
+    goal_state=[3.13, 0.],
     goal_radius=0.1,
     random_seed=0,
     sst_delta_near=0.3,
@@ -16,7 +16,7 @@ base_pendulum_config = dict(
 )
 
 # different configs for cpp and py implementations of the system
-cpp_pendulum_config = dict(system='pendulum', **base_pendulum_config)
+cpp_pendulum_config = dict(system='DampingPendulum', **base_pendulum_config)
 py_pendulum_config = dict(system='py_pendulum', **base_pendulum_config)
 
 

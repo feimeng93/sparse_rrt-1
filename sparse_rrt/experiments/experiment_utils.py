@@ -1,7 +1,7 @@
 import numpy as np
 import time
 
-from sparse_rrt.planners import SST, RRT, SST_Backend
+from sparse_rrt.planners import SST, SST_Backend
 from sparse_rrt.systems import create_standard_system
 from sparse_rrt.visualization import show_image
 
@@ -51,16 +51,6 @@ def run_config(config):
             random_seed=config['random_seed'],
             sst_delta_near=float(config['sst_delta_near']),
             sst_delta_drain=float(config['sst_delta_drain'])
-        )
-    elif config['planner'] == 'rrt':
-        planner = RRT(
-            state_bounds=system.get_state_bounds(),
-            control_bounds=system.get_control_bounds(),
-            distance=system.distance_computer(),
-            start_state=config['start_state'],
-            goal_state=config['goal_state'],
-            goal_radius=config['goal_radius'],
-            random_seed=config['random_seed'],
         )
     else:
         raise Exception("Uknown planner")
@@ -121,7 +111,7 @@ def run_planning_experiment(
         else:
             raise ValueError("Unknown display type %s" % display_type)
 
-    def _display_end(image, wait):
+    def _display_end(im, wait):
         if display_type is None:
             return
         show_image(im, display_type, wait=wait)
@@ -164,4 +154,4 @@ def run_planning_experiment(
               (time.time() - start_time, number_of_iterations, planner.get_number_of_nodes(), solution_cost))
 
     im = _display_begin(planner, system)
-    _display_end(im, wait=False)
+    _display_end(im, wait=True)

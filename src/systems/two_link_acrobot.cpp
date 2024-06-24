@@ -29,11 +29,11 @@ using Eigen::Vector4d;
 #define g  9.8
 // #define integration_step 0.01
 
-#define LENGTH 20.0
-#define lc  .5
-#define lc2  .25
-#define I1  0.2
-#define I2  1.0
+#define LENGTH 1.0
+// #define lc  .5
+// #define lc2  .25
+// #define I1  0.2
+// #define I2  1.0
 
 
 
@@ -43,8 +43,8 @@ using Eigen::Vector4d;
 #define STATE_V_2 3
 #define CONTROL_T 0
 
-#define MIN_V_1 -M_PI
-#define MAX_V_1 M_PI
+#define MIN_V_1 -8
+#define MAX_V_1 8
 #define MIN_V_2 -8
 #define MAX_V_2 8
 #define MIN_T -6
@@ -257,6 +257,7 @@ std::vector<std::pair<double, double> > two_link_acrobot_t::get_state_bounds() c
 
 std::vector<std::pair<double, double> > two_link_acrobot_t::get_control_bounds() const{
     return {
+            {MIN_T,MAX_T},
             {MIN_T,MAX_T}
     };
 }

@@ -51,14 +51,13 @@ bool l_t::propagate(
 		if (valid_state() == true){
 				result_state[0] = temp_state[0];
 				result_state[1] = temp_state[1];
-				validity = true;
 			}
-			else
-			{
-				// Found the earliest invalid position. break the loop and return
-				validity = false; // need to update validity because one node is invalid, the propagation fails
-				break;
-			}
+		else
+		{
+			// Found the earliest invalid position. break the loop and return
+			validity = false; // need to update validity because one node is invalid, the propagation fails
+			break;
+		}
 	}
 	// result_state[0] = temp_state[0];
 	// result_state[1] = temp_state[1];
@@ -124,15 +123,15 @@ std::string l_t::visualize_obstacles(int image_width, int image_height) const
 	double temp[2];
 	for(unsigned i=0;i<obs_min_max.size();i++)
 	{
-		// temp[0] = obs_list[i][0];
-		// temp[1] = obs_list[i][1];
+		temp[0] = obs_min_max[i][0];
+		temp[1] = obs_min_max[i][3];
 		double x, y;
 		std::tie(x, y) = this->visualize_point(temp, 2);
 
 		doc<<svg::Rectangle(svg::Point(x*dims.width, y*dims.height),
 							(obs_min_max[i][1]-obs_min_max[i][0])/(MAX_X-MIN_X) * dims.width,
 							(obs_min_max[i][3]-obs_min_max[i][2])/(MAX_Y-MIN_Y) * dims.height,
-							svg::Color::Red);
+							svg::Color::Blue);
 	}
     return doc.toString();
 }

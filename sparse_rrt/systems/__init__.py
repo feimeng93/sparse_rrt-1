@@ -1,20 +1,17 @@
 from . import standard_cpp_systems
-from sparse_rrt.systems.acrobot import Acrobot
-from sparse_rrt.systems.car import Car
 from sparse_rrt.systems.pendulum import Pendulum
-from sparse_rrt.systems.point import Point
-# from sparse_rrt.systems.cartpole import Cartpole
 
 # List of standard systems that come out of the box
 _standard_system_classes = {
-    'cart_pole': standard_cpp_systems.RectangleObs2D,
+    'CartPole': standard_cpp_systems.RectangleObs2D,
     'Linear2D': standard_cpp_systems.RectangleObs2D,
     'Nonlinear3D': standard_cpp_systems.RectangleObs3D,
-    'pendulum': standard_cpp_systems.Pendulum,
-    'two_link_acrobot': standard_cpp_systems.RectangleObs2D,
+    'DampingPendulum': standard_cpp_systems.Pendulum,
+    'TwoLinkRobot': standard_cpp_systems.RectangleObs2D,
+    'PlanarQuadrotor': standard_cpp_systems.RectangleObs2D,
     'py_pendulum': Pendulum,
     'py_acrobot': standard_cpp_systems.RectangleObs2D,
-    'PlanarQuadrotor': standard_cpp_systems.RectangleObs2D
+    'point': standard_cpp_systems.Point
 }
 
 

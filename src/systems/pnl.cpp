@@ -18,12 +18,13 @@
 #include <cmath>
 #include <assert.h>
 
-#define MIN_X -1
-#define MAX_X 2
-#define MIN_Y -1
-#define MAX_Y 1.5
-#define MIN_Z -2
-#define MAX_Z 2
+#define MIN_X  -0.5
+#define MIN_Y  -0.5
+#define MIN_Z  -2
+
+#define MAX_X  1.5
+#define MAX_Y  0.6
+#define MAX_Z  1
 
 #define MIN_V -0.2
 #define MAX_V 0.2

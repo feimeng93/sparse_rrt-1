@@ -15,6 +15,8 @@
 
 #include "systems/cart_pole.hpp"
 #include "utilities/random.hpp"
+#include "image_creation/svg_image.hpp"
+#include <cmath>
 
 
 #define _USE_MATH_DEFINES
@@ -37,12 +39,12 @@
 #define STATE_W 3
 #define CONTROL_A 0
 
-#define MIN_X -2.4
-#define MAX_X 2.4
+#define MIN_X -3
+#define MAX_X 3
 #define MIN_V -4000
 #define MAX_V 4000
-#define MAX_THETA 0.209
-#define MIN_THETA -0.209
+#define MAX_THETA 0.418
+#define MIN_THETA -0.418
 #define MIN_W -2000
 #define MAX_W 2000
 
@@ -153,6 +155,28 @@ std::tuple<double, double> cart_pole_t::visualize_point(const double* state, uns
     return std::make_tuple(x, y);
 }
 
+std::string cart_pole_t::visualize_obstacles(int image_width, int image_height) const
+{
+    svg::Dimensions dims(image_width, image_height);
+    svg::DocumentBody doc(svg::Layout(dims, svg::Layout::BottomLeft));
+    double circleRadius = 10; 
+    svg::Color circleColor = svg::Color::Blue; 
+    // for(int i = 0; i < obs_list_points.size(); ++i)
+    // {
+    //     for(int j = 0; j < obs_list_points[i].size(); ++j)
+    //     {
+    //         double x = obs_list_points[i][j].at(0);
+    //         double y = obs_list_points[i][j].at(1);
+    //         // Create a circle at this point and add it to the SVG document.
+    //         svg::Circle circle(svg::Point(((x-MIN_X)/(MAX_X-MIN_X)*dims.width), (((y-MIN_X)/(MAX_X-MIN_X)-0.475)*20)*dims.height), circleRadius, svg::Fill(circleColor));
+
+    //         doc << circle;
+    //     }
+    // }
+    
+    return doc.toString();
+}
+
 void cart_pole_t::update_derivative(const double* control)
 {
     double _v = temp_state[STATE_V];
@@ -189,7 +213,7 @@ std::vector<std::pair<double, double> > cart_pole_t::get_state_bounds() const {
     return {
             {MIN_X,MAX_X},
             {MIN_V,MAX_V},
-            {-M_PI,M_PI},
+            {MIN_THETA,MAX_THETA},
             {MIN_W,MAX_W},
     };
 }

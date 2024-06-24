@@ -20,12 +20,14 @@ def visualize_wrapper(parent_class):
             body_string += system.visualize_obstacles(image_width, image_height)
             return render_svg(svg_header(width=image_width, height=image_height) + body_string + svg_footer())
 
-        def visualize_nodes(self, system, image_width=500, image_height=500):
+        def visualize_nodes(self, system, image_width=800, image_height=800, node_diameter=4, solution_node_diameter=8):
             body_string = parent_class.visualize_nodes(
                 self,
                 system,
                 image_width=image_width,
-                image_height=image_height
+                image_height=image_height,
+                node_diameter = node_diameter,
+                solution_node_diameter=solution_node_diameter
             )
             body_string += system.visualize_obstacles(image_width, image_height)
             return render_svg(svg_header(width=image_width, height=image_height) + body_string + svg_footer())
@@ -45,8 +47,8 @@ class SST_Backend(visualize_wrapper(_sst_module.SSTBackendWrapper)):
     '''
     pass
 
-class RRT(visualize_wrapper(_sst_module.RRTWrapper)):
-    '''
-    RRT planner (baseline)
-    '''
-    pass
+# class RRT(visualize_wrapper(_sst_module.RRTWrapper)):
+#     '''
+#     RRT planner (baseline)
+#     '''
+#     pass

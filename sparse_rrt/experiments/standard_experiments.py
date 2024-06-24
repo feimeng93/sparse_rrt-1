@@ -7,7 +7,7 @@ from sparse_rrt.experiments.pendulum_experiments import rrt_pendulum_config, sst
     rrt_py_pendulum_config, sst_py_pendulum_config
 from sparse_rrt.experiments.point_experiments import rrt_point_config, sst_point_config, rrt_py_point_config, \
     sst_py_point_config, rrt_free_point_config, sst_free_point_config
-from sparse_rrt.experiments.rally_car_experiments import rrt_rally_car_config, sst_rally_car_config
+# from sparse_rrt.experiments.rally_car_experiments import rrt_rally_car_config, sst_rally_car_config
 
 
 standard_experiments = {
@@ -25,14 +25,14 @@ standard_experiments = {
     'sst_pendulum': sst_pendulum_config,
     'rrt_py_pendulum': rrt_py_pendulum_config,
     'sst_py_pendulum': sst_py_pendulum_config,
-    'rrt_point': rrt_point_config,
+    # 'rrt_point': rrt_point_config,
     'sst_point': sst_point_config,
-    'rrt_py_point': rrt_py_point_config,
+    # 'rrt_py_point': rrt_py_point_config,
     'sst_py_point': sst_py_point_config,
-    'rrt_free_point': rrt_free_point_config,
-    'sst_free_point': sst_free_point_config,
-    'rrt_rally_car': rrt_rally_car_config,
-    'sst_rally_car': sst_rally_car_config,
+    # 'rrt_free_point': rrt_free_point_config,
+    # 'sst_free_point': sst_free_point_config,
+    # 'rrt_rally_car': rrt_rally_car_config,
+    # 'sst_rally_car': sst_rally_car_config,
 }
 
 

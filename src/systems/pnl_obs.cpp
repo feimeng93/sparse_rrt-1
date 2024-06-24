@@ -136,7 +136,7 @@ std::string pnl_obs_t::visualize_obstacles(int image_width, int image_height) co
 		doc<<svg::Rectangle(svg::Point(x*dims.width, y*dims.height), //TODO: fix this in 3D
 							(obs_min_max.at(i).at(1)-obs_min_max.at(i).at(0))/(MAX_X-MIN_X) * dims.width,
 							(obs_min_max.at(i).at(3)-obs_min_max.at(i).at(4))/(MAX_Y-MIN_Y) * dims.height,
-							svg::Color::Red);
+							svg::Color::Blue);
 	}
     return doc.toString();
 }

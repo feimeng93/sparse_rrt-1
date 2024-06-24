@@ -14,6 +14,9 @@ class WithEuclideanDistanceComputer(object):
 class Pendulum(_sst_module.Pendulum, WithEuclideanDistanceComputer):
     pass
 
+class Point(_sst_module.Point, WithEuclideanDistanceComputer):
+    pass
+
 
 # class TwoLinkAcrobot(_sst_module.TwoLinkAcrobot):
 #     """
@@ -53,7 +56,7 @@ class RectangleObs2D(_sst_module.RectangleObs2DSystem):
         self.env_name = env_name
 
     def distance_computer(self):
-        if self.env_name == "CartPole-v1":
+        if self.env_name == "CartPole":
             return _sst_module.CartpoleDistance()
         elif self.env_name == "Linear2D":
             return _sst_module.LDistance()

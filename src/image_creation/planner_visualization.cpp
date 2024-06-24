@@ -197,9 +197,9 @@ std::string visualize_tree(
 
     visualize_edge(root, projector, doc, dimensions, tree_line_width);
 
-	svg::Circle circle(visualize_point(projector, start_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(255,0,0) ));
+	svg::Circle circle(visualize_point(projector, start_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(0,255,0) ));
 	doc<<circle;
-	svg::Circle circle2(visualize_point(projector, goal_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(0,255,0) ));
+	svg::Circle circle2(visualize_point(projector, goal_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(255,0,0) ));
 	doc<<circle2;
 
 	visualize_solution_path(last_solution_path, projector, doc, dimensions, solution_line_width);
@@ -207,37 +207,35 @@ std::string visualize_tree(
     return doc.toString();
 }
 
-/**
- * @copydoc visualize_nodes()
- */
 std::string visualize_nodes(
-    tree_node_t* root,
-    const std::vector<std::vector<double>>& last_solution_path,
-    projection_function projector,
-    double* start_state, double* goal_state,
-    int image_width, int image_height,
-    double node_diameter, double solution_node_diameter)
+	tree_node_t* root,
+	const std::vector<std::vector<double>>& last_solution_path,
+	projection_function projector,
+	double* start_state, double* goal_state,
+	int image_width, int image_height,
+	double node_diameter, double solution_node_diameter)
 {
-    svg::Dimensions dimensions(image_width, image_height);
-    svg::DocumentBody doc(svg::Layout(dimensions, svg::Layout::BottomLeft));
+	svg::Dimensions dimensions(image_width, image_height);
+	svg::DocumentBody doc(svg::Layout(dimensions, svg::Layout::BottomLeft));
 
-    std::vector<tree_node_t*> sorted_nodes;
-    double max_cost = 0;
-    get_max_cost(root, max_cost, sorted_nodes);
-    sort(sorted_nodes);
+	std::vector<tree_node_t*> sorted_nodes;
+	double max_cost = 0;
+	get_max_cost(root, max_cost, sorted_nodes);
+	sort(sorted_nodes);
 
-    for(unsigned i=sorted_nodes.size()-1;i!=0;i--)
-    {
-	    visualize_node(sorted_nodes[i], projector, doc, dimensions, node_diameter, max_cost);
+	for(int i = static_cast<int>(sorted_nodes.size()) - 1; i >= 0; i--)
+	{
+		visualize_node(sorted_nodes[i], projector, doc, dimensions, node_diameter, max_cost);
 	}
 
-	svg::Circle circle(visualize_point(projector, start_state,dimensions), solution_node_diameter, svg::Fill( svg::Color(255,0,0) ));
-	doc<<circle;
-	svg::Circle circle2(visualize_point(projector, goal_state,dimensions), solution_node_diameter, svg::Fill( svg::Color(0,255,0) ));
+	svg::Circle circle(visualize_point(projector, start_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(255,0,0) ));
+	doc<<circle; //red
+	svg::Circle circle2(visualize_point(projector, goal_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(0,255,0) ));
 	doc<<circle2;
 
-	visualize_solution_nodes(last_solution_path, projector, doc, dimensions, solution_node_diameter);
+	visualize_solution_path(last_solution_path, projector, doc, dimensions, solution_node_diameter);
+// 	// visualize_solution_nodes(last_solution_path, projector, doc, dimensions, solution_node_diameter);
 
-    return doc.toString();
+
+	return doc.toString();
 }
-

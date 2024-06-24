@@ -71,5 +71,9 @@ std::string visualize_nodes(
     int image_width, int image_height,
     double node_diameter, double solution_node_diameter);
 
+void get_max_cost(tree_node_t* node, double& max_cost, std::vector<tree_node_t*>& nodes);
+
+void sort(std::vector<tree_node_t*>& nodes);
+
 
 #endif

@@ -78,6 +78,8 @@ public:
 	 */
 	std::tuple<double, double> visualize_point(const double* state, unsigned int state_dimension) const override;
 
+    std::string visualize_obstacles(int image_width, int image_height) const override;
+
 	/**
 	 * @copydoc system_t::get_state_bounds()
 	 */
