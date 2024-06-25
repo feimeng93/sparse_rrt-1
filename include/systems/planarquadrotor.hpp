@@ -35,15 +35,57 @@ public:
 		validity = true;
 		// copy the items from _obs_list to obs_list
 		for(unsigned i=0;i<_obs_list.size();i++)
-		for(unsigned int oi = 0; oi < _obs_list.size(); oi++){
-			std::vector<double> min_max_i = {_obs_list.at(oi).at(0) - width / 2, _obs_list.at(oi).at(0) + width / 2,
-											 _obs_list.at(oi).at(1) - width / 2, _obs_list.at(oi).at(1) + width / 2
-											};// size = 4
-			obs_min_max.push_back(min_max_i); // size = n_o (* 4)
-		}
+        {
+            // each obstacle is represented by its middle point
+            std::vector<std::vector<double>> obs(4, std::vector<double>(2));
+            // calculate the four points representing the rectangle in the order
+            // UL, UR, LR, LL
+            // the obstacle points are concatenated for efficient calculation
+            double x = _obs_list[i][0];
+            double y = _obs_list[i][1];
+			// order: (left-bottom, right-bottom, right-upper, left-upper)
+
+            obs[0][0] = x - width / 2;  obs[0][1] = y - width / 2;
+            obs[1][0] = x + width / 2;  obs[1][1] = y - width / 2;
+            obs[2][0] = x + width / 2;  obs[2][1] = y + width / 2;
+            obs[3][0] = x - width / 2;  obs[3][1] = y + width / 2;
+            obs_list.push_back(obs);
+
+			// horizontal axis and vertical
+            std::vector<std::vector<double>> obs_axis_i(2, std::vector<double> (2, 0));
+            obs_axis_i[0][0] = obs[1][0] - obs[0][0]; // width
+            obs_axis_i[1][0] = obs[3][0] - obs[0][0]; //0
+            obs_axis_i[0][1] = obs[1][1] - obs[0][1]; //0
+            obs_axis_i[1][1] = obs[3][1] - obs[0][1]; //width
+
+            std::vector<double> obs_length;
+            obs_length.push_back(sqrt(obs_axis_i[0][0]*obs_axis_i[0][0]+obs_axis_i[0][1]*obs_axis_i[0][1]));
+            obs_length.push_back(sqrt(obs_axis_i[1][0]*obs_axis_i[1][0]+obs_axis_i[1][1]*obs_axis_i[1][1]));
+			// ormalize the axis
+            for (unsigned i1=0; i1<2; i1++)
+            {
+                for (unsigned j1=0; j1<2; j1++)
+                {
+                    obs_axis_i[i1][j1] = obs_axis_i[i1][j1] / obs_length[i1];
+                }
+            }
+            obs_axis.push_back(obs_axis_i);
+
+			// obtain the inner product of the left-bottom corner with the axis to obtain the minimal of projection value
+            std::vector<double> obs_ori_i;
+            obs_ori_i.push_back(obs[0][0]*obs_axis_i[0][0]+ obs[0][1]*obs_axis_i[0][1]);
+            obs_ori_i.push_back(obs[0][0]*obs_axis_i[1][0]+ obs[0][1]*obs_axis_i[1][1]);
+
+            obs_ori.push_back(obs_ori_i);
+        }
 
 	}
 	virtual ~planar_quadrotor_t(){ delete[] temp_state; delete[] deriv; delete[] u ;}
+
+	bool overlap(std::vector<std::vector<double>>& b1corner, std::vector<std::vector<double>>& b1axis,
+	             std::vector<double>& b1orign, std::vector<double>& b1ds,
+				 std::vector<std::vector<double>>& b2corner, std::vector<std::vector<double>>& b2axis,
+				 std::vector<double>& b2orign, std::vector<double>& b2ds);
 
 	static double distance(const double* point1, const double* point2, unsigned int);
 
@@ -110,7 +152,10 @@ protected:
 	void update_derivative(const double* control);
 	double *u;
 	bool validity;
-	std::vector<std::vector<double>> obs_min_max;
+	std::vector<std::vector<std::vector<double>>> obs_list;
+	double obs_width;
+    std::vector<std::vector<std::vector<double>>> obs_axis;
+    std::vector<std::vector<double>> obs_ori;
 };
 
 

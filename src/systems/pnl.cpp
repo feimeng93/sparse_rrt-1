@@ -23,7 +23,7 @@
 #define MIN_Z  -2
 
 #define MAX_X  1.5
-#define MAX_Y  0.6
+#define MAX_Y  1.0
 #define MAX_Z  1
 
 #define MIN_V -0.2

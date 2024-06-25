@@ -15,7 +15,7 @@
 #include <assert.h>
 #include "systems/distance_functions.h"
 #include "systems/two_link_acrobot.hpp"
-#include "systems/planarquad.hpp"
+#include "systems/planarquadrotor.hpp"
 #include "systems/cart_pole.hpp"
 #include "systems/pendulum.hpp"
 #include "systems/l.hpp"
@@ -28,7 +28,7 @@ double two_link_acrobot_distance::distance(const double* p0, const double* p1, u
 
 double planarquad_distance::distance(const double* p0, const double* p1, unsigned int state_dimensions) const
 {
-    return planarquad_t::distance(p0, p1, state_dimensions);
+    return planar_quadrotor_t::distance(p0, p1, state_dimensions);
 
 }
 

@@ -8,27 +8,18 @@
  * For a full description see the file named LICENSE.
  *
  * Original authors: Zakary Littlefield, Kostas Bekris
- * Modifications by: Oleg Y. Sinyavskiy
- * 
+ * Modifications by: Yinglong Miao
+ *
  */
 
 
 #include "systems/cart_pole.hpp"
-#include "utilities/random.hpp"
-#include "image_creation/svg_image.hpp"
-#include <cmath>
-
-
-#define _USE_MATH_DEFINES
-
-
-#include <cmath>
 
 
 #define I 10
-#define L 0.5
-#define M 1
-#define m 0.1
+#define L 2.5
+#define M 10
+#define m 5
 #define g 9.8
 // height of the cart
 #define H 0.5
@@ -39,14 +30,12 @@
 #define STATE_W 3
 #define CONTROL_A 0
 
-#define MIN_X -3
-#define MAX_X 3
-#define MIN_V -4000
-#define MAX_V 4000
-#define MAX_THETA 0.418
-#define MIN_THETA -0.418
-#define MIN_W -2000
-#define MAX_W 2000
+#define MIN_X -30
+#define MAX_X 30
+#define MIN_V -10
+#define MAX_V 10
+#define MIN_W -2
+#define MAX_W 2
 
 
 bool cart_pole_t::propagate(
@@ -54,15 +43,23 @@ bool cart_pole_t::propagate(
     const double* control, unsigned int control_dimension,
     int num_steps, double* result_state, double integration_step)
 {
-        temp_state[0] = start_state[0]; 
+        // std::cout<< start_state[0] <<","<<  start_state[1] <<","<<  start_state[2] <<","<<  start_state[3]<<std::endl;
+        temp_state[0] = start_state[0];
         temp_state[1] = start_state[1];
         temp_state[2] = start_state[2];
         temp_state[3] = start_state[3];
         bool validity = false;
-        
+        double enforced_control;
+        if(*control > 300){
+            enforced_control = 300;
+        } else if(*control < -300){
+            enforced_control = -300;
+        } else {
+            enforced_control = *control;
+        }
         for(int i=0;i<num_steps;i++)
         {
-                update_derivative(control);
+                update_derivative(&enforced_control);
                 temp_state[0] += integration_step*deriv[0];
                 temp_state[1] += integration_step*deriv[1];
                 temp_state[2] += integration_step*deriv[2];
@@ -83,33 +80,45 @@ bool cart_pole_t::propagate(
                     validity = false; // need to update validity because one node is invalid, the propagation fails
                     break;
                 }
-        }        
+        }
+        // std::cout<< result_state[0] <<","<<  result_state[1] <<","<<  result_state[2] <<","<<  result_state[3]<<std::endl;
+        // std::cout<<validity<<std::endl;
+        // std::cout<<validity<<std::endl;
+        //result_state[0] = temp_state[0];
+        //result_state[1] = temp_state[1];
+        //result_state[2] = temp_state[2];
+        //result_state[3] = temp_state[3];
         return validity;
 }
-//TODO confirm the theta bounds
+
 void cart_pole_t::enforce_bounds()
 {
-        if(temp_state[0]<MIN_X)
-                temp_state[0]=MIN_X;
-        else if(temp_state[0]>MAX_X)
-                temp_state[0]=MAX_X;
+        // fpr the position, if it is outside of bound, we don't enforce it back
+        //if(temp_state[0]<MIN_X)
+        //        temp_state[0]=MIN_X;
+        //else if(temp_state[0]>MAX_X)
+        //        temp_state[0]=MAX_X;
 
+        if(temp_state[1]<MIN_V)
+                temp_state[1]=MIN_V;
+        else if(temp_state[1]>MAX_V)
+                temp_state[1]=MAX_V;
 
-        // if(temp_state[2]<-M_PI)
-        //         temp_state[2]+=2*M_PI;
-        // else if(temp_state[2]>M_PI)
-        //         temp_state[2]-=2*M_PI;
-        if(temp_state[2]<MIN_THETA)
-                temp_state[2]=MIN_THETA;
-        else if(temp_state[2]>MAX_THETA)
-                temp_state[2]=MAX_THETA;
+        if(temp_state[2]<-M_PI)
+                temp_state[2]+=2*M_PI;
+        else if(temp_state[2]>M_PI)
+                temp_state[2]-=2*M_PI;
 
-
+        if(temp_state[3]<MIN_W)
+                temp_state[3]=MIN_W;
+        else if(temp_state[3]>MAX_W)
+                temp_state[3]=MAX_W;
 }
+
 
 bool cart_pole_t::valid_state()
 {
-        // check the pole with the rectangle to see if in collision
+    // check the pole with the rectangle to see if in collision
     // calculate the pole state
     // check if the position is within bound
     if (temp_state[0] < MIN_X or temp_state[0] > MAX_X)
@@ -161,21 +170,22 @@ std::string cart_pole_t::visualize_obstacles(int image_width, int image_height) 
     svg::DocumentBody doc(svg::Layout(dims, svg::Layout::BottomLeft));
     double circleRadius = 10; 
     svg::Color circleColor = svg::Color::Blue; 
-    // for(int i = 0; i < obs_list_points.size(); ++i)
-    // {
-    //     for(int j = 0; j < obs_list_points[i].size(); ++j)
-    //     {
-    //         double x = obs_list_points[i][j].at(0);
-    //         double y = obs_list_points[i][j].at(1);
-    //         // Create a circle at this point and add it to the SVG document.
-    //         svg::Circle circle(svg::Point(((x-MIN_X)/(MAX_X-MIN_X)*dims.width), (((y-MIN_X)/(MAX_X-MIN_X)-0.475)*20)*dims.height), circleRadius, svg::Fill(circleColor));
+    for(int i = 0; i < obs_list_points.size(); ++i)
+    {
+        for(int j = 0; j < obs_list_points[i].size(); ++j)
+        {
+            double x = obs_list_points[i][j].at(0);
+            double y = obs_list_points[i][j].at(1);
+            // Create a circle at this point and add it to the SVG document.
+            svg::Circle circle(svg::Point(((x-MIN_X)/(MAX_X-MIN_X)*dims.width), (((y-MIN_X)/(MAX_X-MIN_X)-0.475)*20)*dims.height), circleRadius, svg::Fill(circleColor));
 
-    //         doc << circle;
-    //     }
-    // }
+            doc << circle;
+        }
+    }
     
     return doc.toString();
 }
+
 
 void cart_pole_t::update_derivative(const double* control)
 {
@@ -183,14 +193,15 @@ void cart_pole_t::update_derivative(const double* control)
     double _w = temp_state[STATE_W];
     double _theta = temp_state[STATE_THETA];
     double _a = control[CONTROL_A];
-    double total_mass = M + m;
+    double mass_term = (M + m)*(I + m * L * L) - m * m * L * L * cos(_theta) * cos(_theta);
 
     deriv[STATE_X] = _v;
     deriv[STATE_THETA] = _w;
-    double temp = (_a + L * m * _w  * _w * sin(_theta))/ total_mass;
-    deriv[STATE_W] = (g * sin(_theta) - cos(_theta) * temp) / (L * (4.0 / 3.0 - m * cos(_theta) * cos(_theta) / total_mass));
-    deriv[STATE_V] = temp - m * L * deriv[STATE_W] * cos(_theta) / total_mass;
+    mass_term = (1.0 / mass_term);
+    deriv[STATE_V] = ((I + m * L * L)*(_a + m * L * _w * _w * sin(_theta)) + m * m * L * L * cos(_theta) * sin(_theta) * g) * mass_term;
+    deriv[STATE_W] = ((-m * L * cos(_theta))*(_a + m * L * _w * _w * sin(_theta))+(M + m)*(-m * g * L * sin(_theta))) * mass_term;
 }
+
 
 bool cart_pole_t::lineLine(double x1, double y1, double x2, double y2, double x3, double y3, double x4, double y4)
 // compute whether two lines intersect with each other
@@ -209,11 +220,14 @@ bool cart_pole_t::lineLine(double x1, double y1, double x2, double y2, double x3
     // not intersect
     return false;
 }
+
+
+
 std::vector<std::pair<double, double> > cart_pole_t::get_state_bounds() const {
     return {
             {MIN_X,MAX_X},
             {MIN_V,MAX_V},
-            {MIN_THETA,MAX_THETA},
+            {-M_PI,M_PI},
             {MIN_W,MAX_W},
     };
 }
@@ -221,7 +235,7 @@ std::vector<std::pair<double, double> > cart_pole_t::get_state_bounds() const {
 
 std::vector<std::pair<double, double> > cart_pole_t::get_control_bounds() const {
     return {
-            {-10,10},
+            {-300,300},
     };
 }
 
@@ -235,10 +249,59 @@ std::vector<bool> cart_pole_t::is_circular_topology() const {
     };
 }
 
+
+// double cart_pole_t::get_loss(double* state, const double* goal, double* weight){
+//     // return angular_error(state[2], goal[2]) * weight[2] + 
+//     //     abs(state[0] - goal[0]) * weight[0] + abs(state[1] - goal[1]) * weight[1] + abs(state[3] - goal[3]) * weight[3];
+//     double val = fabs(state[STATE_THETA]-goal[STATE_THETA]);
+//     if(val > M_PI)
+//             val = 2*M_PI-val;
+//     return std::sqrt(val * val * weight[STATE_THETA] + pow(state[STATE_X]-goal[STATE_X], 2.0) * weight[STATE_X]+ pow(state[STATE_V]-goal[STATE_V], 2.0)* weight[STATE_V] 
+//         + pow(state[STATE_W]-goal[STATE_W], 2.0)* weight[STATE_W]);
+// }
+
+// double cart_pole_t::angular_error(double angle, double goal){
+//     double error = angle - goal;
+//     if(error < 0){
+//         error = - error;
+//     }
+//     else if (error > M_PI){
+//         error = 2*M_PI - error;
+//     }
+//     return error;
+// }
+
+
+// void cart_pole_t::normalize(const double* state, double* normalized){
+//     normalized[STATE_X] = state[STATE_X] / MAX_X;
+//     normalized[STATE_V] = state[STATE_V] /MAX_V;
+//     normalized[STATE_THETA] = state[STATE_THETA] / M_PI;
+//     normalized[STATE_W] = state[STATE_W] / MAX_W;
+// }
+
+// void cart_pole_t::denormalize(double* normalized, double* state){
+//     state[STATE_X] = normalized[STATE_X] * MAX_X;
+//     state[STATE_V] = normalized[STATE_V] * MAX_V;
+//     state[STATE_THETA] = normalized[STATE_THETA] * M_PI;
+//     state[STATE_W] = normalized[STATE_W]  * MAX_W;
+// }
+
 double cart_pole_t::distance(const double* point1, const double* point2, unsigned int)
 {
     double val = fabs(point1[STATE_THETA]-point2[STATE_THETA]);
     if(val > M_PI)
             val = 2*M_PI-val;
     return std::sqrt(val * val + pow(point1[0]-point2[0], 2.0) + pow(point1[1]-point2[1], 2.0)+ pow(point1[3]-point2[3], 2.0));
+    // return std::sqrt( val * val + pow(point1[0]-point2[0], 2.0)  );
+
 }
+
+// double cart_pole_t::state_distance(const double* point1, const double* point2, unsigned int)
+// {
+//     double val = fabs(point1[STATE_THETA]-point2[STATE_THETA]);
+//     if(val > M_PI)
+//             val = 2*M_PI-val;
+//     return std::sqrt(val * val + pow(point1[0]-point2[0], 2.0) + pow(point1[1]-point2[1], 2.0)+ pow(point1[3]-point2[3], 2.0));
+//     // return std::sqrt( val * val + pow(point1[0]-point2[0], 2.0)  );
+
+// }

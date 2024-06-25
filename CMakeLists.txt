@@ -85,7 +85,7 @@ set(SOURCE_FILES
     src/systems/cart_pole.cpp
     src/systems/pendulum.cpp
     src/systems/two_link_acrobot.cpp
-    src/systems/planarquad.cpp
+    src/systems/planarquadrotor.cpp
     src/systems/distance_functions.cpp
     ${PLANNING_UTILS}
 )

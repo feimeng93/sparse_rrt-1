@@ -125,7 +125,7 @@ void sst_t::get_solution(std::vector<std::vector<double>>& solution_path, std::v
 	}
 }
 
-void sst_t::step(system_interface* system, int min_time_steps, int max_time_steps, double integration_step)
+void  sst_t::step(system_interface* system, int min_time_steps, int max_time_steps, double integration_step)
 {
     /*
      * Generate a random sample
@@ -147,6 +147,11 @@ void sst_t::step(system_interface* system, int min_time_steps, int max_time_step
 	{
 		add_to_tree(sample_state, sample_control, nearest, duration);
 	}
+    std::vector<double> sam (this->state_dimension);
+    for (unsigned i = 0; i < this->state_dimension; i++) {
+        sam[i] = sample_state[i];
+    }
+    sample_states.push_back(sam);
     delete sample_state;
     delete sample_control;
 }

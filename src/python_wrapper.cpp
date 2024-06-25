@@ -108,7 +108,6 @@ euclidean_distance create_euclidean_distance(
 class PlannerWrapper
 {
 public:
-
     /**
 	 * @copydoc planner_t::step()
 	 */
@@ -227,32 +226,18 @@ public:
     }
 
     py::object get_samples() {
-        std::vector<tree_node_t*> sorted_nodes;
-        double max_cost = 0;
-        get_max_cost(planner->get_root(), max_cost, sorted_nodes);
-        sort(sorted_nodes);
-
-        double state_dimension = planner->get_state_dimension();
-        // py::safe_array<double> nodes_array({sorted_nodes.size(), int(state_dimension)});
-        py::safe_array<double> nodes_array({static_cast<ptrdiff_t>(sorted_nodes.size()), static_cast<ptrdiff_t>(state_dimension)});
-        auto nodes_ref = nodes_array.mutable_unchecked<2>();
-        for (int i = static_cast<int>(sorted_nodes.size()) - 1; i >= 0; i--) {
-            for (unsigned int j = 0; j < state_dimension; ++j) {
-                nodes_ref(i, j) = sorted_nodes[i]->get_point()[j];
-            }
-        }
-        py::safe_array<double> nodes_costs_array({static_cast<ptrdiff_t>(sorted_nodes.size()), static_cast<ptrdiff_t>(state_dimension)});
-        auto nodes_costs_ref = nodes_costs_array.mutable_unchecked<2>();
-        for (int i = static_cast<int>(sorted_nodes.size()) - 1; i >= 0; i--) {
-            for (unsigned int j = 0; j < state_dimension; ++j) {
-                nodes_costs_ref(i, j) = sorted_nodes[i]->get_cost()/max_cost;
+        std::vector<std::vector<double>> samples = planner->sample_states;
+        py::safe_array<double> samples_array({samples.size(), samples[0].size()});
+        auto sample_ref = samples_array.mutable_unchecked<2>();
+        for (unsigned int i = 0; i < samples.size(); ++i) {
+            for (unsigned int j = 0; j < samples[0].size(); ++j) {
+                sample_ref(i, j) = samples[i][j];
             }
         }
 
-
-        return py::cast(std::tuple<py::safe_array<double>, py::safe_array<double>>
-            (nodes_array, nodes_costs_array));
+        return py::cast(std::tuple<py::safe_array<double>> (samples_array));
     }
+
 
     /**
 	 * @copydoc planner_t::get_number_of_nodes()
@@ -340,13 +325,14 @@ public:
             };
 
         planner.reset(
-                new sst_backend_t(
+                new sst_t(
                         &start_state(0), &goal_state(0), goal_radius,
                         state_bounds_v, control_bounds_v,
                         distance_f,
                         random_seed,
                         sst_delta_near, sst_delta_drain)
         );
+
     }
 private:
 

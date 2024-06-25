@@ -18,46 +18,6 @@
 
 #include "systems/system.hpp"
 
-// class Rectangle_t
-// {
-// public:
-// 	/**
-// 	 * @brief Create a rectangle using two corners
-// 	 * 
-// 	 * @param lx Bottom Left X coordinate
-// 	 * @param ly Bottom Left Y coordinate
-// 	 * @param hx Top Right X coordinate
-// 	 * @param hy Top Right Y coordinate
-// 	 */
-// 	Rectangle_t(double lx,double ly,double hx,double hy)
-// 	{
-// 		low_x = lx;
-// 		low_y = ly;
-// 		high_x = hx;
-// 		high_y = hy;
-// 	}
-// 	/**
-// 	 * @brief Create a rectangle with center position and dimensions.
-// 	 *
-// 	 * @param pos_x Center X coordinate.
-// 	 * @param pos_y Center Y coordinate.
-// 	 * @param dim_x X Dimension
-// 	 * @param dim_y Y Dimension
-// 	 * @param value Just a flag to denote which constructor is used.
-// 	 */
-// 	Rectangle_t(double pos_x,double pos_y,double dim_x,double dim_y,bool value)
-// 	{
-// 		low_x = pos_x-dim_x/2;
-// 		low_y = pos_y-dim_y/2;
-// 		high_x = pos_x+dim_x/2;
-// 		high_y = pos_y+dim_y/2;
-// 	}
-// 	double low_x;
-// 	double low_y;
-// 	double high_x;
-// 	double high_y;
-// };
-
 /**
  * @brief A simple system implementing a 2d point. 
  * @details A simple system implementing a 2d point. It's controls include velocity and direction.

@@ -89,6 +89,8 @@ public:
         return this->parent;
     }
 
+
+
 private:
     /**
      * @brief Parent node.
@@ -273,6 +275,8 @@ protected:
 	 * @brief Container for witness nodes (to avoid memory leaks)
 	 */
     std::vector<sample_node_t*> witness_nodes;
+
+
 };
 
 #endif

@@ -228,14 +228,13 @@ std::string visualize_nodes(
 		visualize_node(sorted_nodes[i], projector, doc, dimensions, node_diameter, max_cost);
 	}
 
-	svg::Circle circle(visualize_point(projector, start_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(255,0,0) ));
-	doc<<circle; //red
-	svg::Circle circle2(visualize_point(projector, goal_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(0,255,0) ));
+	svg::Circle circle(visualize_point(projector, start_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(0,255,0)));
+	doc<<circle; //green
+	svg::Circle circle2(visualize_point(projector, goal_state, dimensions), solution_node_diameter, svg::Fill( svg::Color(255,0,0)));
 	doc<<circle2;
 
 	visualize_solution_path(last_solution_path, projector, doc, dimensions, solution_node_diameter);
 // 	// visualize_solution_nodes(last_solution_path, projector, doc, dimensions, solution_node_diameter);
-
 
 	return doc.toString();
 }

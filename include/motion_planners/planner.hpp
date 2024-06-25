@@ -166,6 +166,9 @@ public:
 	 */
     unsigned int get_number_of_nodes() const {return this->number_of_nodes;};
 
+    std::vector<std::vector<double>> sample_states;
+
+
 protected:
 
     /**
@@ -219,6 +222,8 @@ protected:
 
 	/** @brief The number of nodes in the tree. */
 	unsigned number_of_nodes;
+
+
 };
 
 

@@ -29,13 +29,15 @@
 #define MIN_V -1.0
 #define MAX_V 1.0
 
-#define MIN_CONTROL -19.62
+#define MIN_CONTROL 0
 #define MAX_CONTROL 19.62
 
 #define m 2.0
 #define g 9.81
 #define I 1.0
 #define l 0.2
+#define WIDTH 0.4
+#define LENGTH 0.2
 
 #define STATE_Y 0
 #define STATE_Z 1
@@ -111,48 +113,146 @@ void planar_quadrotor_t::enforce_bounds()
 	else if(temp_state[1]>MAX_Z)
 		temp_state[1]=MAX_Z;
 
-	if(temp_state[2]<-MIN_THETA)
+	if(temp_state[2]<MIN_THETA)
 		temp_state[2]=MIN_THETA;
 	else if(temp_state[1]>MAX_THETA)
 		temp_state[2]=MAX_THETA;
 	
-	if(temp_state[3]<-MIN_V)
+	if(temp_state[3]<MIN_V)
 		temp_state[3]=MIN_V;
 	else if(temp_state[3]>MAX_V)
 		temp_state[3]=MAX_V;
 
-	if(temp_state[4]<-MIN_V)
+	if(temp_state[4]<MIN_V)
 		temp_state[4]=MIN_V;
 	else if(temp_state[4]>MAX_V)
 		temp_state[4]=MAX_V;
 
-	if(temp_state[5]<-MIN_V)
+	if(temp_state[5]<MIN_V)
 		temp_state[5]=MIN_V;
 	else if(temp_state[5]>MAX_V)
 		temp_state[5]=MAX_V;
 }
 
 
+// bool planar_quadrotor_t::valid_state()
+// {
+// 	bool obstacle_collision = false;
+// 	//any obstacles need to be checked here
+// 	for(unsigned i=0;i<obs_min_max.size() && !obstacle_collision;i++)
+// 	{
+// 		if(	temp_state[0]>=obs_min_max[i][0] && 
+// 			temp_state[0]<=obs_min_max[i][1] && 
+// 			temp_state[1]>=obs_min_max[i][2] && 
+// 			temp_state[1]<=obs_min_max[i][3])
+// 		{
+// 			obstacle_collision = true;
+// 		}
+// 	}
+
+// 	return !obstacle_collision && 
+// 			(temp_state[0]!=MIN_Y) &&
+// 			(temp_state[0]!=MAX_Y) &&
+// 			(temp_state[1]!=MIN_Z) &&
+// 			(temp_state[1]!=MAX_Z);
+// }
+bool planar_quadrotor_t::overlap(std::vector<std::vector<double>>& b1corner, std::vector<std::vector<double>>& b1axis,
+                        std::vector<double>& b1orign, std::vector<double>& b1ds,
+                        std::vector<std::vector<double>>& b2corner, std::vector<std::vector<double>>& b2axis,
+                        std::vector<double>& b2orign, std::vector<double>& b2ds)
+{
+    for (unsigned a = 0; a < 2; a++)
+    {
+        double t = b1corner[0][0]*b2axis[a][0] + b1corner[0][1]*b2axis[a][1];
+        double tMin = t;
+        double tMax = t;
+        for (unsigned c = 1; c < 4; c++)
+        {
+            t = b1corner[c][0]*b2axis[a][0]+b1corner[c][1]*b2axis[a][1];
+            if (t < tMin)
+            {
+                tMin = t;
+            }
+            else if (t > tMax)
+            {
+                tMax = t;
+            }
+        }
+        if ((tMin > (b2ds[a] + b2orign[a])) || (tMax < b2orign[a]))
+        {
+            return false;
+        }
+    }
+    return true;
+
+}
+
 bool planar_quadrotor_t::valid_state()
 {
-	bool obstacle_collision = false;
-	//any obstacles need to be checked here
-	for(unsigned i=0;i<obs_min_max.size() && !obstacle_collision;i++)
-	{
-		if(	temp_state[0]>=obs_min_max[i][0] && 
-			temp_state[0]<=obs_min_max[i][1] && 
-			temp_state[1]>=obs_min_max[i][2] && 
-			temp_state[1]<=obs_min_max[i][3])
-		{
-			obstacle_collision = true;
-		}
-	}
+    if (temp_state[0] < MIN_Y || temp_state[0] > MAX_Y || temp_state[1] < MIN_Z || temp_state[1] > MAX_Z)
+    {
+        return false;
+    }
+    //std::cout << "inside  valid_state" << std::endl;
 
-	return !obstacle_collision && 
-			(temp_state[0]!=MIN_Y) &&
-			(temp_state[0]!=MAX_Y) &&
-			(temp_state[1]!=MIN_Z) &&
-			(temp_state[1]!=MAX_Z);
+    std::vector<std::vector<double>> robot_corner(4, std::vector<double> (2, 0));
+    std::vector<std::vector<double>> robot_axis(2, std::vector<double> (2,0));
+    std::vector<double> robot_ori(2, 0);
+    std::vector<double> length(2, 0);
+    std::vector<double> X1(2,0);
+    std::vector<double> Y1(2,0);
+    
+
+    X1[0]=sin(temp_state[STATE_THETA])*(WIDTH/2.0);
+    X1[1]=-cos(temp_state[STATE_THETA])*(WIDTH/2.0);
+    Y1[0]=cos(temp_state[STATE_THETA])*(LENGTH/2.0);
+    Y1[1]=sin(temp_state[STATE_THETA])*(LENGTH/2.0);
+
+    for (unsigned j = 0; j < 2; j++)
+    {
+        // order: (left-bottom, right-bottom, right-upper, left-upper)
+        robot_corner[0][j]=temp_state[j]-X1[j]-Y1[j];
+        robot_corner[1][j]=temp_state[j]+X1[j]-Y1[j];
+        robot_corner[2][j]=temp_state[j]+X1[j]+Y1[j];
+        robot_corner[3][j]=temp_state[j]-X1[j]+Y1[j];
+        //axis: horizontal and vertical
+        robot_axis[0][j] = robot_corner[1][j] - robot_corner[0][j];
+        robot_axis[1][j] = robot_corner[3][j] - robot_corner[0][j];
+    }
+
+    length[0]=sqrt(robot_axis[0][0]*robot_axis[0][0]+robot_axis[0][1]*robot_axis[0][1]);
+    length[1]=sqrt(robot_axis[1][0]*robot_axis[1][0]+robot_axis[1][1]*robot_axis[1][1]);
+
+    for (unsigned i=0; i<2; i++)
+    {
+        for (unsigned j=0; j<2; j++)
+        {
+            robot_axis[i][j]=robot_axis[i][j]/length[i];
+        }
+    }
+    // obtain the projection of the left-bottom corner to the axis, to obtain the minimal projection length
+    robot_ori[0]=robot_corner[0][0]*robot_axis[0][0]+ robot_corner[0][1]*robot_axis[0][1];
+    robot_ori[1]=robot_corner[0][0]*robot_axis[1][0]+ robot_corner[0][1]*robot_axis[1][1];
+
+    static std::vector<double> car_size{WIDTH, LENGTH};
+    static std::vector<double> obs_size{this->obs_width, this->obs_width};
+
+    for (unsigned i=0; i<obs_list.size(); i++)
+    {
+        bool collision = true;
+        // do checking in both direction (b1 -> b2, b2 -> b1). It is only collision if both direcions are collision
+        collision = overlap(robot_corner,robot_axis,robot_ori,car_size,\
+                            obs_list[i],obs_axis[i],obs_ori[i],obs_size);
+        collision = collision&overlap(obs_list[i],obs_axis[i],obs_ori[i],obs_size,\
+                                      robot_corner,robot_axis,robot_ori,car_size);
+        if (collision)
+        {
+            return false;  // invalid state
+        }
+    }
+    //std::cout << "after valid" << std::endl;
+
+    return true;
 }
 
 void planar_quadrotor_t::update_derivative(const double* control)
@@ -184,16 +284,16 @@ std::string planar_quadrotor_t::visualize_obstacles(int image_width, int image_h
     svg::Dimensions dims(image_width, image_height);
     svg::DocumentBody doc(svg::Layout(dims, svg::Layout::BottomLeft));
 	double temp[2];
-	for(unsigned i=0;i<obs_min_max.size();i++)
+	for(unsigned i=0;i<obs_list.size();i++)
 	{
-		temp[0] = obs_min_max[i][0];
-		temp[1] = obs_min_max[i][3];
+		temp[0] = obs_list[i][0][0]; //-x
+		temp[1] = obs_list[i][2][1];//+y
 		double x, y;
 		std::tie(x, y) = this->visualize_point(temp, 2);
 
 		doc<<svg::Rectangle(svg::Point(x*dims.width, y*dims.height),
-							(obs_min_max[i][1]-obs_min_max[i][0])/(MAX_Y-MIN_Y) * dims.width,
-							(obs_min_max[i][3]-obs_min_max[i][2])/(MAX_Z-MIN_Z) * dims.height,
+							(obs_list[i][1][0]-obs_list[i][0][0])/(MAX_Y-MIN_Y) * dims.width,
+							(obs_list[i][2][1]-obs_list[i][1][1])/(MAX_Z-MIN_Z) * dims.height,
 							svg::Color::Blue);
 	}
     return doc.toString();
