@@ -79,7 +79,6 @@ set(PLANNING_UTILS
 set(SOURCE_FILES
     src/motion_planners/sst.cpp
     src/motion_planners/sst_backend.cpp
-    src/systems/point.cpp
     src/systems/l.cpp
     src/systems/pnl.cpp
     src/systems/cart_pole.cpp

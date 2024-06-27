@@ -19,9 +19,9 @@
 #include <assert.h>
 
 #define MIN_X -3
-#define MAX_X 1
+#define MAX_X 3
 #define MIN_Y -3
-#define MAX_Y 4
+#define MAX_Y 3
 
 #define MIN_V -0.5
 #define MAX_V 0.5

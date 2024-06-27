@@ -11,7 +11,7 @@ _standard_system_classes = {
     'PlanarQuadrotor': standard_cpp_systems.RectangleObs2D,
     'py_pendulum': Pendulum,
     'py_acrobot': standard_cpp_systems.RectangleObs2D,
-    'point': standard_cpp_systems.Point
+    # 'point': standard_cpp_systems.Point
 }
 
 

@@ -14,8 +14,8 @@ class WithEuclideanDistanceComputer(object):
 class Pendulum(_sst_module.Pendulum, WithEuclideanDistanceComputer):
     pass
 
-class Point(_sst_module.Point, WithEuclideanDistanceComputer):
-    pass
+# class Point(_sst_module.Point, WithEuclideanDistanceComputer):
+#     pass
 
 
 # class TwoLinkAcrobot(_sst_module.TwoLinkAcrobot):

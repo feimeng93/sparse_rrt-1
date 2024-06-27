@@ -1,3 +1,0 @@
-#there should be a build
-#create a script inside the build directory: cmake, make, doxygen (it could ask)
-#show the goal radius in the output

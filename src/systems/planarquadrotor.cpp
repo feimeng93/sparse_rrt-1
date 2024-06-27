@@ -22,8 +22,8 @@
 #define MAX_Z 2
 #define MIN_Y -2
 #define MAX_Y 2
-#define MIN_THETA -M_PI/3
-#define MAX_THETA M_PI/3
+#define MIN_THETA -1.0471975512
+#define MAX_THETA 1.0471975512
 
 
 #define MIN_V -1.0
@@ -87,7 +87,6 @@ bool planar_quadrotor_t::propagate(
 				result_state[3] = temp_state[3];
 				result_state[4] = temp_state[4];
 				result_state[5] = temp_state[5];
-
 			}
 		else
 		{
@@ -115,7 +114,7 @@ void planar_quadrotor_t::enforce_bounds()
 
 	if(temp_state[2]<MIN_THETA)
 		temp_state[2]=MIN_THETA;
-	else if(temp_state[1]>MAX_THETA)
+	else if(temp_state[2]>MAX_THETA)
 		temp_state[2]=MAX_THETA;
 	
 	if(temp_state[3]<MIN_V)
@@ -134,28 +133,6 @@ void planar_quadrotor_t::enforce_bounds()
 		temp_state[5]=MAX_V;
 }
 
-
-// bool planar_quadrotor_t::valid_state()
-// {
-// 	bool obstacle_collision = false;
-// 	//any obstacles need to be checked here
-// 	for(unsigned i=0;i<obs_min_max.size() && !obstacle_collision;i++)
-// 	{
-// 		if(	temp_state[0]>=obs_min_max[i][0] && 
-// 			temp_state[0]<=obs_min_max[i][1] && 
-// 			temp_state[1]>=obs_min_max[i][2] && 
-// 			temp_state[1]<=obs_min_max[i][3])
-// 		{
-// 			obstacle_collision = true;
-// 		}
-// 	}
-
-// 	return !obstacle_collision && 
-// 			(temp_state[0]!=MIN_Y) &&
-// 			(temp_state[0]!=MAX_Y) &&
-// 			(temp_state[1]!=MIN_Z) &&
-// 			(temp_state[1]!=MAX_Z);
-// }
 bool planar_quadrotor_t::overlap(std::vector<std::vector<double>>& b1corner, std::vector<std::vector<double>>& b1axis,
                         std::vector<double>& b1orign, std::vector<double>& b1ds,
                         std::vector<std::vector<double>>& b2corner, std::vector<std::vector<double>>& b2axis,

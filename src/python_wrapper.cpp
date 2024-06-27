@@ -19,7 +19,6 @@
 #include <assert.h>
 #include <vector>
 
-#include "systems/point.hpp"
 #include "systems/l.hpp"
 #include "systems/pnl.hpp"
 #include "systems/cart_pole.hpp"
@@ -30,7 +29,6 @@
 
 #include "motion_planners/sst.hpp"
 #include "motion_planners/sst_backend.hpp"
-
 #include "image_creation/planner_visualization.hpp"
 #include "systems/distance_functions.h"
 
@@ -789,10 +787,6 @@ PYBIND11_MODULE(_sst_module, m) {
       py::class_<pendulum_t>(m, "Pendulum", system).def(py::init<>());
 //    py::class_<two_link_acrobot_t>(m, "TwoLinkAcrobot", system).def(py::init<>());
 //    py::class_<quadrotor_t>(m, "Quadrotor", system).def(py::init<>());
-        py::class_<point_t>(m, "Point", system)
-       .def(py::init<int>(),
-            "number_of_obstacles"_a=5
-       );
    /**
     * Universal system interface for obs based envs
     */
